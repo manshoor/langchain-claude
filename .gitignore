@@ -1,0 +1,26 @@
+# Allowlist: ignore everything, then allow only known source files.
+# A new file stays out of git until it is added here on purpose, so local
+# secrets (.env, keys), chat.db, .venv and caches can never slip in.
+*
+
+# Folders must be re-allowed so git can look inside them.
+!*/
+
+# Project files.
+!.gitignore
+!README.md
+!pyproject.toml
+!uv.lock
+!.python-version
+!*.py
+!docs/*.md
+
+# Never commit these, even if a rule above would match.
+.venv/
+__pycache__/
+.env*
+*.db
+*.db-*
+*.sqlite*
+*.pem
+*.key
