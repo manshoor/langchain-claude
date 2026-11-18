@@ -39,28 +39,33 @@ def today() -> str:
     return date.today().isoformat()
 
 
-# create_agent runs the loop: model -> tool calls -> results -> model ... -> answer.
-agent = create_agent(
-    model=make_model(),
-    tools=[convert_to_aed, check_server, today],
-    system_prompt="You are a concise ops assistant. Use tools for facts.",
-)
+QUESTION = "What's today's date, is web-2 okay, and what is 1200 EUR in AED?"
 
-QUESTION = (
-    "What's today's date, is web-2 okay, and what is 1200 EUR in AED?"
-)
-result = agent.invoke({"messages": [{"role": "user", "content": QUESTION}]})
 
-# Print each step in one line so you can see which tools the model chose.
-print(f"You: {QUESTION}\n")
-for message in result["messages"]:
-    if isinstance(message, AIMessage):
-        for call in message.tool_calls:
-            print(f"  call   {call['name']}({call['args']})")
-        continue
+def main() -> None:
+    """Ask one question and print each tool call the agent makes."""
+    # create_agent runs the loop: model -> tool calls -> results -> model ... -> answer.
+    agent = create_agent(
+        model=make_model(),
+        tools=[convert_to_aed, check_server, today],
+        system_prompt="You are a concise ops assistant. Use tools for facts.",
+    )
+    result = agent.invoke({"messages": [{"role": "user", "content": QUESTION}]})
 
-    if isinstance(message, ToolMessage):
-        print(f"  result {message.name}: {message.content}")
+    # Print each step in one line so you can see which tools the model chose.
+    print(f"You: {QUESTION}\n")
+    for message in result["messages"]:
+        if isinstance(message, AIMessage):
+            for call in message.tool_calls:
+                print(f"  call   {call['name']}({call['args']})")
+            continue
 
-# The last message is the model's final answer.
-print(f"\nAgent:\n{result['messages'][-1].text}")
+        if isinstance(message, ToolMessage):
+            print(f"  result {message.name}: {message.content}")
+
+    # The last message is the model's final answer.
+    print(f"\nAgent:\n{result['messages'][-1].text}")
+
+
+if __name__ == "__main__":
+    main()

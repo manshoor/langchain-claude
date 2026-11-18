@@ -148,48 +148,54 @@ def _stored_count(chat, config: dict) -> int:
     return len(chat.get_state(config).values.get("messages", []))
 
 
-args = _parse_args()
-default_thread = DEFAULT_THREAD if args.chat else DEMO_THREAD
-thread_id = args.thread or default_thread
-config = {"configurable": {"thread_id": thread_id}}
+def main() -> None:
+    """Run the scripted demo, the interactive chat, or a reset."""
+    args = _parse_args()
+    default_thread = DEFAULT_THREAD if args.chat else DEMO_THREAD
+    thread_id = args.thread or default_thread
+    config = {"configurable": {"thread_id": thread_id}}
 
-# The connection stays open for the whole run and closes on exit.
-with SqliteSaver.from_conn_string(str(DB_PATH)) as checkpointer:
-    chat = create_agent(
-        model=make_model(),
-        tools=[today, web_search, get_weather],
-        system_prompt=(
-            "You are a friendly tutor. Keep answers under 80 words. "
-            "Use the tools for today's date, weather and current facts."
-        ),
-        middleware=[
-            SummarizationMiddleware(
-                model=make_model(), trigger=SUMMARY_TRIGGER, keep=SUMMARY_KEEP
-            )
-        ],
-        checkpointer=checkpointer,
-    )
+    # The connection stays open for the whole run and closes on exit.
+    with SqliteSaver.from_conn_string(str(DB_PATH)) as checkpointer:
+        chat = create_agent(
+            model=make_model(),
+            tools=[today, web_search, get_weather],
+            system_prompt=(
+                "You are a friendly tutor. Keep answers under 80 words. "
+                "Use the tools for today's date, weather and current facts."
+            ),
+            middleware=[
+                SummarizationMiddleware(
+                    model=make_model(), trigger=SUMMARY_TRIGGER, keep=SUMMARY_KEEP
+                )
+            ],
+            checkpointer=checkpointer,
+        )
 
-    # Reset: delete the thread's history and stop.
-    if args.reset:
+        # Reset: delete the thread's history and stop.
+        if args.reset:
+            checkpointer.delete_thread(thread_id)
+            print(f"Deleted thread '{thread_id}'.")
+            return
+
+        # Interactive: resume the thread and read lines until an empty one.
+        if args.chat:
+            print(f"Thread '{thread_id}': {_stored_count(chat, config)} messages stored.")
+            print("Empty line quits.\n")
+            while line := input("you> ").strip():
+                print(f"bot> {_ask(chat, config, line)}")
+                print(f"     ({_stored_count(chat, config)} messages stored)\n")
+            return
+
+        # Scripted: start the demo thread fresh so every run shows the same thing.
+        # The stored count drops when the summary replaces old messages; the last
+        # turn only works if the goal survived in that summary.
         checkpointer.delete_thread(thread_id)
-        print(f"Deleted thread '{thread_id}'.")
-        raise SystemExit(0)
-
-    # Interactive: resume the thread and read lines until an empty one.
-    if args.chat:
-        print(f"Thread '{thread_id}': {_stored_count(chat, config)} messages stored.")
-        print("Empty line quits.\n")
-        while line := input("you> ").strip():
-            print(f"bot> {_ask(chat, config, line)}")
+        for turn in DEMO_TURNS:
+            print(f"you> {turn}")
+            print(f"bot> {_ask(chat, config, turn)}")
             print(f"     ({_stored_count(chat, config)} messages stored)\n")
-        raise SystemExit(0)
 
-    # Scripted: start the demo thread fresh so every run shows the same thing.
-    # The stored count drops when the summary replaces old messages; the last
-    # turn only works if the goal survived in that summary.
-    checkpointer.delete_thread(thread_id)
-    for turn in DEMO_TURNS:
-        print(f"you> {turn}")
-        print(f"bot> {_ask(chat, config, turn)}")
-        print(f"     ({_stored_count(chat, config)} messages stored)\n")
+
+if __name__ == "__main__":
+    main()

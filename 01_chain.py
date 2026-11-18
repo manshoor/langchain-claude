@@ -9,8 +9,6 @@ from pydantic import BaseModel, Field
 
 from common import make_model
 
-model = make_model()
-
 # Part A: a plain text chain. The "|" operator pipes each step into the next.
 explain_prompt = ChatPromptTemplate.from_messages(
     [
@@ -18,10 +16,6 @@ explain_prompt = ChatPromptTemplate.from_messages(
         ("user", "Explain {topic} to a {audience}."),
     ]
 )
-explain_chain = explain_prompt | model | StrOutputParser()
-
-print("== Plain chain ==")
-print(explain_chain.invoke({"topic": "a load balancer", "audience": "PHP developer"}))
 
 
 # Part B: structured output. The model must return data matching this schema.
@@ -38,16 +32,29 @@ extract_prompt = ChatPromptTemplate.from_messages(
     [("user", "Extract the posting details.\n\n{posting}")]
 )
 
-# method="json_schema" uses the API's native structured output. The default
-# (tool calling) would force a tool call, which Opus 5.5 rejects.
-extract_chain = extract_prompt | model.with_structured_output(
-    JobPosting, method="json_schema"
-)
-
 POSTING = """Acme Logistics is hiring a Senior Backend Engineer in Dubai, UAE.
 You will build Node.js and TypeScript services on AWS, with PostgreSQL and Redis.
 Docker and Terraform experience is a plus."""
 
-print("\n== Structured output ==")
-job = extract_chain.invoke({"posting": POSTING})
-print(job.model_dump_json(indent=2))
+
+def main() -> None:
+    """Run the plain chain, then the structured-output chain."""
+    model = make_model()
+
+    # Part A: prompt | model | parser.
+    explain_chain = explain_prompt | model | StrOutputParser()
+    print("== Plain chain ==")
+    print(explain_chain.invoke({"topic": "a load balancer", "audience": "PHP developer"}))
+
+    # Part B: method="json_schema" uses the API's native structured output. The
+    # default (tool calling) would force a tool call, which Opus 5.5 rejects.
+    extract_chain = extract_prompt | model.with_structured_output(
+        JobPosting, method="json_schema"
+    )
+    print("\n== Structured output ==")
+    job = extract_chain.invoke({"posting": POSTING})
+    print(job.model_dump_json(indent=2))
+
+
+if __name__ == "__main__":
+    main()
