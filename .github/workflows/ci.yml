@@ -1,0 +1,38 @@
+# Lint, offline tests and the retrieval eval on every push and pull request.
+# Nothing here calls the Claude API, so CI needs no API key and costs nothing.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # Keep the ~70 MB embedding model in a fixed place so it can be cached.
+      FASTEMBED_CACHE_PATH: /home/runner/.cache/fastembed
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Unit tests
+        run: uv run pytest -q
+
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cache/fastembed
+          key: fastembed-bge-small-en-v1.5
+
+      - name: Retrieval eval (BM25 vs vector vs hybrid)
+        run: uv run eval_retrieval.py >> "$GITHUB_STEP_SUMMARY"
