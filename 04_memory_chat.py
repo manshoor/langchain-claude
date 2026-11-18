@@ -22,6 +22,7 @@ import argparse
 import json
 from datetime import date
 from pathlib import Path
+from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
@@ -98,6 +99,16 @@ def get_weather(city: str) -> str:
 
     Pass the full city name, e.g. 'Ras Al Khaimah' rather than 'RAK'.
     """
+    # Network failures come back as text, so the agent can tell the user
+    # instead of the whole run crashing. URLError covers HTTP errors too.
+    try:
+        return _weather_report(city)
+    except (URLError, TimeoutError) as error:
+        return f"Weather lookup failed: {error}"
+
+
+def _weather_report(city: str) -> str:
+    """Look up a city's coordinates, then its weather, and describe it."""
     # Step 1: city name -> coordinates.
     places = _get_json(GEOCODE_URL, {"name": city, "count": 1}).get("results")
     if not places:
