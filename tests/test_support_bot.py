@@ -2,14 +2,16 @@
 
 import importlib
 
+import support_tools
+
 bot = importlib.import_module("05_support_bot")
 
 
 def test_ticket_numbers(monkeypatch) -> None:
-    monkeypatch.setattr(bot, "_tickets", [])
+    monkeypatch.setattr(support_tools, "_tickets", [])
 
-    first = bot.create_ticket.invoke({"summary": "Store pickup in Abu Dhabi"})
-    second = bot.create_ticket.invoke({"summary": "Late parcel", "priority": "urgent"})
+    first = support_tools.create_ticket.invoke({"summary": "Store pickup in Abu Dhabi"})
+    second = support_tools.create_ticket.invoke({"summary": "Late parcel", "priority": "urgent"})
 
     assert first.startswith("Ticket TCK-0001 opened (normal)")
     assert second.startswith("Ticket TCK-0002 opened (urgent)")

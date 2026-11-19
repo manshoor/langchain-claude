@@ -23,22 +23,20 @@
 """
 
 import argparse
-from datetime import date
-from enum import StrEnum
 from pathlib import Path
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import SummarizationMiddleware
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-from langchain_core.tools import BaseTool, tool
 from langchain_core.vectorstores import InMemoryVectorStore
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 from common import make_model
-from retrieval import format_chunks, load_chunks, vector_store
+from retrieval import load_chunks, vector_store
+from support_tools import create_ticket, search_tool, today
 
 DB_PATH = Path(__file__).parent / "chat.db"
-TOP_K = 3
 DEMO_THREAD = "support-demo"
 DEFAULT_THREAD = "support"
 
@@ -69,40 +67,17 @@ DEMO_TURNS = [
 ]
 
 
-class Priority(StrEnum):
-    """Ticket urgency, from the customer's point of view."""
-
-    LOW = "low"
-    NORMAL = "normal"
-    URGENT = "urgent"
-
-
-_tickets: list[str] = []
-
-
-@tool
-def create_ticket(summary: str, priority: Priority = Priority.NORMAL) -> str:
-    """Open a support ticket for a human agent. Use only after the customer agrees."""
-    # A real bot would call the help-desk API here.
-    _tickets.append(summary)
-    return f"Ticket TCK-{len(_tickets):04d} opened ({priority}). A human replies within one business day."
-
-
-@tool
-def today() -> str:
-    """Return today's date, for questions about deadlines like '30 days from purchase'."""
-    return date.today().isoformat()
-
-
-def _search_tool(store: InMemoryVectorStore) -> BaseTool:
-    """Wrap the vector store as a tool the agent can call."""
-
-    @tool
-    def search_policies(query: str) -> str:
-        """Search Acme's policy documents. Returns matching passages tagged with their file."""
-        return format_chunks(store.similarity_search(query, k=TOP_K))
-
-    return search_policies
+def build_bot(store: InMemoryVectorStore, checkpointer: BaseCheckpointSaver):
+    """Build the single-agent support bot. The workflow eval reuses this."""
+    return create_agent(
+        model=make_model(),
+        tools=[search_tool(store), create_ticket, today],
+        system_prompt=SYSTEM_PROMPT,
+        middleware=[
+            SummarizationMiddleware(model=make_model(), trigger=SUMMARY_TRIGGER, keep=SUMMARY_KEEP)
+        ],
+        checkpointer=checkpointer,
+    )
 
 
 def _parse_args() -> argparse.Namespace:
@@ -154,17 +129,7 @@ def main() -> None:
             print(f"Deleted thread '{thread_id}'.")
             return
 
-        bot = create_agent(
-            model=make_model(),
-            tools=[_search_tool(vector_store(load_chunks())), create_ticket, today],
-            system_prompt=SYSTEM_PROMPT,
-            middleware=[
-                SummarizationMiddleware(
-                    model=make_model(), trigger=SUMMARY_TRIGGER, keep=SUMMARY_KEEP
-                )
-            ],
-            checkpointer=checkpointer,
-        )
+        bot = build_bot(vector_store(load_chunks()), checkpointer)
 
         # Interactive: resume the thread and read lines until an empty one.
         if args.chat:
