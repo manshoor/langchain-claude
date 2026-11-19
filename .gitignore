@@ -9,6 +9,7 @@
 # Project files.
 !.gitignore
 !README.md
+!workflow.html
 !pyproject.toml
 !uv.lock
 !.python-version
