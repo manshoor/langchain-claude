@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support Workflow Explorer</title>
+<style>
+  /* Colour tokens: light by default, dark when the system asks for it. */
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #d9d8d2;
+    --accent: #c2410c; --accent-soft: #fde7da; --ok: #15803d; --warn: #b45309; --bad: #b91c1c;
+    --haiku: #0f766e; --sonnet: #6d28d9; --opus: #c2410c; --code: #f0efea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161614; --panel: #1f1f1c; --ink: #ecebe6; --muted: #a3a29b; --line: #3a3934;
+      --accent: #fb923c; --accent-soft: #3b2417; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+      --haiku: #2dd4bf; --sonnet: #a78bfa; --opus: #fb923c; --code: #2a2a26;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161614; --panel: #1f1f1c; --ink: #ecebe6; --muted: #a3a29b; --line: #3a3934;
+    --accent: #fb923c; --accent-soft: #3b2417; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+    --haiku: #2dd4bf; --sonnet: #a78bfa; --opus: #fb923c; --code: #2a2a26;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 1120px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 26px; margin: 0 0 6px; }
+  h2 { font-size: 18px; margin: 0 0 12px; }
+  h3 { font-size: 15px; margin: 0 0 6px; }
+  p { margin: 0 0 10px; }
+  code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  .lead { color: var(--muted); max-width: 760px; }
+
+  /* Tabs */
+  nav.tabs { display: flex; gap: 6px; margin: 20px 0 16px; flex-wrap: wrap; }
+  nav.tabs button, .chip-btn, .ctl {
+    font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    padding: 7px 14px; border-radius: 8px; cursor: pointer;
+  }
+  nav.tabs button[aria-selected="true"], .chip-btn[aria-pressed="true"] {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+  }
+  .ctl:disabled { opacity: .45; cursor: default; }
+  section[hidden] { display: none; }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .label { color: var(--muted); font-size: 13px; margin-right: 4px; }
+
+  /* Graph */
+  svg { width: 100%; height: auto; display: block; }
+  .edge { fill: none; stroke: var(--line); stroke-width: 2; transition: stroke .25s; }
+  .edge.on { stroke: var(--accent); stroke-width: 3; }
+  .edge-label { fill: var(--muted); font-size: 12px; }
+  .node rect, .node circle { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; transition: all .25s; }
+  .node text { fill: var(--ink); font-size: 14px; text-anchor: middle; pointer-events: none; }
+  .node .sub { font-size: 11.5px; font-weight: 600; }
+  .node { cursor: pointer; outline: none; }
+  .node:hover rect, .node:focus-visible rect { stroke: var(--accent); }
+  .node.on rect, .node.on circle { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2.5; }
+  .node.sel rect { stroke: var(--ink); stroke-dasharray: 4 3; }
+  .node.dim { opacity: .35; }
+  .node .m-haiku { fill: var(--haiku); } .node .m-sonnet { fill: var(--sonnet); } .node .m-opus { fill: var(--opus); }
+
+  /* Run log and state */
+  .log { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code);
+         border-radius: 8px; padding: 10px; min-height: 150px; max-height: 260px; overflow: auto;
+         white-space: pre-wrap; overflow-wrap: anywhere; }
+  .log .cur { color: var(--accent); font-weight: 600; }
+  .log .past { color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px;
+         font-weight: 600; color: #fff; }
+  .t-haiku { background: var(--haiku); } .t-sonnet { background: var(--sonnet); } .t-opus { background: var(--opus); }
+  .t-code { background: var(--muted); }
+  .detail ul { margin: 6px 0 10px; padding-left: 18px; }
+  .stack > * + * { margin-top: 16px; }
+
+  /* Project map */
+  .map { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .card { text-align: left; font: inherit; color: inherit; background: var(--panel);
+          border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+  .card:hover, .card[aria-pressed="true"] { border-color: var(--accent); }
+  .card[aria-pressed="true"] { background: var(--accent-soft); }
+  .card b { display: block; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+  .card span { color: var(--muted); font-size: 13px; }
+  .group-title { margin: 18px 0 8px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+
+  /* Bar charts */
+  .bars { display: grid; grid-template-columns: 120px 1fr 70px; gap: 6px 10px; align-items: center; font-size: 13.5px; }
+  .bar { height: 16px; border-radius: 4px; background: var(--accent); }
+  .bar.alt { background: var(--muted); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .note { color: var(--muted); font-size: 13px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Customer support bot on Claude: LangChain, LangGraph, Langfuse</h1>
+  <p class="lead">
+    The repo builds a support bot that answers from 11 policy documents, cites its sources,
+    remembers each customer and hands off to a human when the documents have no answer.
+    It is built twice: once as one agent (05), once as a LangGraph workflow where three Claude
+    models split each turn (06). Evals measure both.
+  </p>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="graph">Workflow (06)</button>
+    <button role="tab" aria-selected="false" data-tab="map">Project map</button>
+    <button role="tab" aria-selected="false" data-tab="results">Results</button>
+  </nav>
+
+  <!-- ===== Tab 1: the 06 graph, playable ===== -->
+  <section id="tab-graph">
+    <div class="grid">
+      <div class="panel">
+        <div class="row">
+          <span class="label">Preset</span>
+          <span id="presets"></span>
+        </div>
+        <svg id="graph" viewBox="0 0 760 640" role="img" aria-label="LangGraph workflow: triage, research, write, review, reply, handoff"></svg>
+        <p class="note">Click a node for details. Orange shows the path of the step being played.</p>
+      </div>
+
+      <div class="stack">
+        <div class="panel">
+          <h2>Play a real run</h2>
+          <div class="row" id="scenarios"></div>
+          <div class="row">
+            <button class="ctl" id="prev">◀ Back</button>
+            <button class="ctl" id="play">▶ Play</button>
+            <button class="ctl" id="next">Next ▶</button>
+            <span class="label" id="stepinfo"></span>
+          </div>
+          <div class="log" id="log" aria-live="polite"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Turn state (<code>TurnState</code>)</h3>
+          <table id="state"></table>
+        </div>
+
+        <div class="panel detail" id="detail"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Tab 2: files and how they connect ===== -->
+  <section id="tab-map" hidden>
+    <div class="grid">
+      <div class="panel">
+        <h2>Files</h2>
+        <div id="map"></div>
+      </div>
+      <div class="panel detail" id="file-detail"></div>
+    </div>
+  </section>
+
+  <!-- ===== Tab 3: eval results ===== -->
+  <section id="tab-results" hidden>
+    <div class="grid">
+      <div class="panel">
+        <h2>Workflow eval: 05 vs 06</h2>
+        <p class="note" style="margin-top:0">24 questions, one fresh conversation each, graded by an Opus 5.5 judge
+          against the doc that answers it. Run on 2026-11-19 for $1.93.</p>
+        <div class="row" id="metric"></div>
+        <div class="bars" id="wf-bars"></div>
+        <p class="note" id="wf-note"></p>
+      </div>
+      <div class="panel">
+        <h2>Retrieval eval: MRR</h2>
+        <p class="note" style="margin-top:0">MRR (mean reciprocal rank): 1.0 means the right doc always ranks first.
+          Offline, no API calls.</p>
+        <div class="row" id="qset"></div>
+        <div class="bars" id="rt-bars"></div>
+        <p class="note" id="rt-note"></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+// ---- Data: models, presets and nodes, taken from 06_support_workflow.py ----
+
+const MODELS = {
+  haiku: { name: "Haiku 5.5", id: "claude-haiku-5-5", price: "$0.10 / $0.50" },
+  sonnet: { name: "Sonnet 5.5", id: "claude-sonnet-5-5", price: "$2 / $10" },
+  opus: { name: "Opus 5.5", id: "claude-opus-5-5", price: "$4 / $20" },
+};
+
+// Seat per role per preset: [model, effort].
+const PRESETS = {
+  mixed: { triage: ["haiku", "low"], research: ["haiku", "medium"], write: ["opus", "low"], review: ["sonnet", "medium"],
+           eval: "Judge 0.83 · $0.0120 per question · 8.8 s median" },
+  opus: { triage: ["opus", "low"], research: ["opus", "low"], write: ["opus", "low"], review: ["opus", "low"],
+          eval: "Judge 0.81 · $0.0401 per question · 12.6 s median" },
+  haiku: { triage: ["haiku", "medium"], research: ["haiku", "medium"], write: ["haiku", "medium"], review: ["haiku", "medium"],
+           eval: "Not in the eval run." },
+};
+
+// Node boxes: centre x, y and width. Research is drawn as three parallel subagents.
+const NODES = {
+  start: { x: 380, y: 30, circle: true, label: "START" },
+  triage: { x: 380, y: 110, w: 160, label: "triage", role: "triage" },
+  r1: { x: 230, y: 210, w: 130, label: "research #1", role: "research" },
+  r2: { x: 380, y: 210, w: 130, label: "research #2", role: "research" },
+  r3: { x: 530, y: 210, w: 130, label: "research #3", role: "research" },
+  write: { x: 380, y: 310, w: 160, label: "write", role: "write" },
+  review: { x: 380, y: 410, w: 160, label: "review", role: "review" },
+  reply: { x: 380, y: 510, w: 160, label: "reply" },
+  handoff: { x: 650, y: 460, w: 150, label: "handoff" },
+  end: { x: 380, y: 600, circle: true, label: "END" },
+};
+
+// Edges as SVG paths, with an optional label position.
+const EDGES = {
+  "start-triage": { d: "M380,42 L380,85" },
+  "triage-r1": { d: "M380,135 L230,185" }, "triage-r2": { d: "M380,135 L380,185" }, "triage-r3": { d: "M380,135 L530,185" },
+  "r1-write": { d: "M230,235 L380,285" }, "r2-write": { d: "M380,235 L380,285" }, "r3-write": { d: "M530,235 L380,285" },
+  "triage-write": { d: "M300,104 L90,104 L90,302 L300,302", label: [96, 200, "chat"] },
+  "triage-handoff": { d: "M460,110 L650,110 L650,435", label: [560, 102, "handoff"] },
+  "write-review": { d: "M380,335 L380,385" },
+  "write-reply": { d: "M300,318 L150,318 L150,510 L300,510", label: [156, 420, "chat: no review"] },
+  "review-write": { d: "M460,400 L520,400 L520,320 L460,320", label: [526, 364, "revise (once)"] },
+  "review-reply": { d: "M380,435 L380,485", label: [388, 466, "pass"] },
+  "review-handoff": { d: "M460,422 L575,455", label: [470, 452, "not covered"] },
+  "reply-end": { d: "M380,535 L380,588" },
+  "handoff-end": { d: "M650,485 L650,600 L392,600" },
+};
+
+// What each node does, shown when clicked.
+const DETAILS = {
+  start: { title: "START", body: "<p>Each customer message starts one turn. The graph loads the thread's checkpoint from <code>chat.db</code>, so the conversation so far is in <code>messages</code>.</p>" },
+  triage: { title: "triage", role: "triage", body: `
+    <p>Reads the last 12 messages and returns a <code>Triage</code> dict: route, 1–3 sub-questions, priority, reason.</p>
+    <ul><li><b>answer</b> → one research subagent per sub-question (max 3), sent with <code>Send</code>.</li>
+    <li><b>chat</b> → straight to write (greetings, "what was my name?").</li>
+    <li><b>handoff</b> → straight to the consent question.</li></ul>
+    <p>Also resets the turn fields (<code>findings</code> with <code>Overwrite([])</code>, draft, review, revisions).</p>
+    <p>Structured output via <code>with_structured_output(..., method="json_schema")</code>. A refused Haiku call retries on Sonnet.</p>` },
+  research: { title: "research subagent", role: "research", body: `
+    <p>A LangChain <code>create_agent</code> with one tool, <code>search_policies</code> (vector search over <code>docs/*.md</code>, top 3).
+    One subagent per sub-question, all in parallel. Results merge with an <code>operator.add</code> reducer.</p>
+    <ul><li>At most 4 model calls each (<code>ModelCallLimitMiddleware</code>).</li>
+    <li>If it hits the limit before writing notes, the writer gets the raw passages instead.</li>
+    <li>No checkpointer: subagents keep no memory of their own.</li></ul>` },
+  write: { title: "write", role: "write", body: `
+    <p>Drafts the reply from the research notes, citing each fact as <code>[file.md]</code>. Gets today's date and,
+    on a rewrite, the reviewer's problems.</p>
+    <p>Adds no general knowledge. On a chat turn it gets "no new research", so it does not retract earlier answers.</p>` },
+  review: { title: "review", role: "review", body: `
+    <p>A different model checks each claim against the raw passages and the list of questions the reply must answer.
+    Returns a <code>Review</code> dict.</p>
+    <ul><li><b>pass</b> → reply.</li><li><b>revise</b> → back to write, once.</li>
+    <li><b>not_covered</b>, or still failing after the rewrite → handoff.</li></ul>` },
+  reply: { title: "reply", body: "<p>Plain code, no model. Adds the approved draft to <code>messages</code> as an <code>AIMessage</code>. Only text crosses between roles, so no model sees another model's thinking or tool calls.</p>" },
+  handoff: { title: "handoff", body: `
+    <p>Plain code. Calls <code>interrupt()</code>: the graph saves its state and pauses until the customer answers.
+    The CLI resumes it with <code>Command(resume=answer)</code>.</p>
+    <p>A clear yes opens a ticket with <code>create_ticket</code>. Any refusal word ("ok, no thanks") opens nothing.</p>` },
+  end: { title: "END", body: "<p>The turn ends. The meter prints cost and model calls; with Langfuse keys the turn is one trace, with scores for route, verdict, revisions and sources cited.</p>" },
+};
+
+// ---- Data: real runs from the README sample (preset mixed) ----
+
+const SCENARIOS = {
+  refund: {
+    title: "Refund + timing",
+    steps: [
+      { on: ["start", "triage"], edges: ["start-triage"],
+        log: "you> Hi, I'm Sara. I bought a laptop 20 days ago. Can I get my money back, and how long until it reaches my card?\n     triage   answer · normal · 2 sub-questions",
+        state: { route: "answer", findings: "0", draft: "", verdict: "", revisions: "0" } },
+      { on: ["r1", "r2"], edges: ["triage-r1", "triage-r2"],
+        log: "     research \"What is Acme's refund policy for a laptop ...?\" → refund-policy.md\n     research \"How long does it take for a refund to appear ...?\" → refund-policy.md",
+        state: { findings: "2" } },
+      { on: ["write"], edges: ["r1-write", "r2-write"], log: "     write    draft, 75 words", state: { draft: "75 words" } },
+      { on: ["review"], edges: ["write-review"],
+        log: "     review   revise: the claim about the card issuer's posting time is not in any passage",
+        state: { verdict: "revise", revisions: "1" } },
+      { on: ["write"], edges: ["review-write"], log: "     write    draft, 61 words", state: { draft: "61 words" } },
+      { on: ["review"], edges: ["write-review"], log: "     review   pass", state: { verdict: "pass" } },
+      { on: ["reply"], edges: ["review-reply"],
+        log: "bot> Hi Sara! Yes, your laptop is eligible. Refunds are available within 30 days of purchase ... [refund-policy.md]. Once approved, the refund goes back to your original payment method within 7 business days [refund-policy.md]." },
+      { on: ["end"], edges: ["reply-end"],
+        log: "     cost     $0.0217 · 9 model calls (Haiku ×5, Opus ×2, Sonnet ×2) · 14.3 s" },
+    ],
+  },
+  pickup: {
+    title: "Not covered → ticket",
+    steps: [
+      { on: ["start", "triage"], edges: ["start-triage"],
+        log: "you> Can I pick the order up from your Abu Dhabi store instead?\n     triage   answer · low · 1 sub-question",
+        state: { route: "answer", findings: "0", draft: "", verdict: "", revisions: "0" } },
+      { on: ["r1"], edges: ["triage-r1"], log: "     research \"Can customers pick up online orders in person ...?\" → shipping.md", state: { findings: "1" } },
+      { on: ["write"], edges: ["r1-write"], log: "     write    draft, 52 words", state: { draft: "52 words" } },
+      { on: ["review"], edges: ["write-review"],
+        log: "     review   not_covered: the passages say nothing about in-store pickup", state: { verdict: "not_covered" } },
+      { on: ["handoff"], edges: ["review-handoff"],
+        log: "bot> Our policies don't cover that. Shall I open a ticket so a human can help?\n     (graph paused by interrupt(), state saved)\nyou> yes" },
+      { on: ["end"], edges: ["handoff-end"],
+        log: "bot> I've passed this to a human. Ticket TCK-0001 opened (low).\n     cost     $0.0105 · 6 model calls (Haiku ×4, Opus ×1, Sonnet ×1) · 9.9 s" },
+    ],
+  },
+  chat: {
+    title: "Chat from memory",
+    steps: [
+      { on: ["start", "triage"], edges: ["start-triage"],
+        log: "you> Thanks. What was my name again?\n     triage   chat · low · no sub-questions",
+        state: { route: "chat", findings: "0", draft: "", verdict: "", revisions: "0" } },
+      { on: ["write"], edges: ["triage-write"], log: "     write    draft, 30 words (no research)", state: { draft: "30 words" } },
+      { on: ["reply"], edges: ["write-reply"], log: "bot> Your name is Sara, as you mentioned at the start of our chat. ..." },
+      { on: ["end"], edges: ["reply-end"], log: "     cost     $0.0036 · 2 model calls (Haiku ×1, Opus ×1) · 3.1 s" },
+    ],
+  },
+};
+
+// ---- Data: eval results from README.md ----
+
+const WF_EVAL = {
+  judge: { title: "Judge score (higher is better)", fmt: v => v.toFixed(2), rows: [["05 one agent", .90], ["06 mixed", .83], ["06 opus", .81]],
+           note: "The single agent wins on single-doc questions. The review gate sent one answerable question to a handoff." },
+  cost: { title: "Cost per question (lower is better)", fmt: v => "$" + v.toFixed(4), rows: [["05 one agent", .0124], ["06 mixed", .0120], ["06 opus", .0401]],
+          note: "Mixing models cuts cost: 06 mixed makes 3× the calls of 05 for the same money. Opus in every role costs 3.3× more and is no better." },
+  time: { title: "Median time (lower is better)", fmt: v => v.toFixed(1) + " s", rows: [["05 one agent", 3.5], ["06 mixed", 8.8], ["06 opus", 12.6]],
+          note: "The workflow runs 4 roles in sequence, so it is about 2.5× slower than one agent." },
+};
+
+const RT_EVAL = {
+  all: { rows: [["BM25", .72], ["vector", .97], ["hybrid (RRF)", .90]], note: "Vector search wins overall. The bot uses it." },
+  keyword: { rows: [["BM25", 1.00], ["vector", .94], ["hybrid (RRF)", .94]], note: "Questions that reuse the docs' words: BM25 is perfect." },
+  paraphrase: { rows: [["BM25", .44], ["vector", 1.00], ["hybrid (RRF)", .85]], note: "Paraphrased questions: \"Riyadh\" shares no word with \"GCC orders\", so BM25 misses." },
+};
+
+// ---- Data: project files ----
+
+const FILES = [
+  { group: "Learning path: one idea per script", items: [
+    ["01_chain.py", "Prompt → model → Pydantic", "A prompt template piped into the model, then structured output into a Pydantic model."],
+    ["02_agent.py", "create_agent + 3 tools", "The model decides which local <code>@tool</code> functions to call and when."],
+    ["03_rag.py", "RAG with BM25", "Load <code>docs/*.md</code>, split, keyword retrieval, answer with sources."],
+    ["03b_rag_vector.py", "RAG with vectors", "Local fastembed embeddings in an <code>InMemoryVectorStore</code>, similarity scores printed."],
+    ["04_memory_chat.py", "Memory per thread", "Multi-turn chat saved to <code>chat.db</code> (SQLite) per <code>--thread</code>; old turns summarized. Tools: today, web search, weather."],
+  ]},
+  { group: "The support bot, twice", items: [
+    ["05_support_bot.py", "One Opus agent", "02 + 03b + 04 in one agent: RAG as a tool, citations, memory, ticket hand-off. The agent decides every step."],
+    ["06_support_workflow.py", "LangGraph, 3 models", "A <code>StateGraph</code> where code fixes the steps and models fill them in: triage, parallel research, write, review, consent pause. See the Workflow tab."],
+  ]},
+  { group: "Shared code", items: [
+    ["common.py", "Models + cost meter", "<code>make_model(model, effort)</code> with server-side fallback where supported; <code>UsageMeter</code> counts calls, tokens and dollars per model, thread-safe."],
+    ["retrieval.py", "Search methods", "Loading, splitting, and BM25, vector and hybrid (reciprocal rank fusion) search."],
+    ["support_tools.py", "Shared tools", "<code>search_policies</code>, <code>create_ticket</code>, <code>today</code>, used by 05 and 06."],
+    ["tracing.py", "Langfuse, isolated", "The only file that talks to Langfuse: one trace per turn, scores, experiments. Does nothing without keys and never fails a turn."],
+  ]},
+  { group: "Evals and tests", items: [
+    ["eval_retrieval.py", "Free, runs in CI", "BM25 vs vector vs hybrid on 24 labeled questions. Writes its table to the CI job summary."],
+    ["eval_workflow.py", "Paid, about $2", "05 vs 06 presets on 24 questions, graded by an Opus judge, run as Langfuse experiments."],
+    ["tests/", "80 offline tests", "Tools, retrieval, graph routing with fake roles, tracing, eval scoring. No model calls, so CI needs no secret."],
+  ]},
+  { group: "Data", items: [
+    ["docs/*.md", "11 policy docs", "Refunds, shipping, warranty, pricing and more for Acme, a sample store. The only source the bot may cite."],
+    ["chat.db", "Conversation memory", "SQLite checkpoints, one thread per customer. 06 threads are stored as <code>06:&lt;name&gt;</code>. Not in git."],
+  ]},
+];
+
+// ---- Rendering helpers ----
+
+const $ = sel => document.querySelector(sel);
+const SVG_NS = "http://www.w3.org/2000/svg";
+const NODE_H = 50;
+const PLAY_MS = 1400;
+
+let preset = "mixed";
+let scenario = "refund";
+let step = -1;
+let timer = null;
+let selected = "triage";
+
+function svgEl(tag, attrs, parent) {
+  const el = document.createElementNS(SVG_NS, tag);
+  Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+  parent.appendChild(el);
+  return el;
+}
+
+function seatFor(role) {
+  return role ? PRESETS[preset][role] : null;
+}
+
+function modelTag(role) {
+  const seat = seatFor(role);
+  if (!seat) {
+    return '<span class="tag t-code">plain code, no model</span>';
+  }
+  const [model, effort] = seat;
+  return `<span class="tag t-${model}">${MODELS[model].name}</span> <span class="label">effort ${effort}</span>`;
+}
+
+// ---- Graph: draw once, then toggle classes ----
+
+function drawGraph() {
+  const svg = $("#graph");
+  const defs = svgEl("defs", {}, svg);
+  const marker = svgEl("marker", { id: "arrow", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, defs);
+  svgEl("path", { d: "M0,0 L10,5 L0,10 z", fill: "currentColor" }, marker).style.color = "var(--muted)";
+
+  // Edges first, so nodes sit on top.
+  for (const [id, e] of Object.entries(EDGES)) {
+    svgEl("path", { d: e.d, class: "edge", id: "e-" + id, "marker-end": "url(#arrow)" }, svg);
+    if (e.label) {
+      svgEl("text", { x: e.label[0], y: e.label[1], class: "edge-label" }, svg).textContent = e.label[2];
+    }
+  }
+
+  for (const [id, n] of Object.entries(NODES)) {
+    const g = svgEl("g", { class: "node", id: "n-" + id, tabindex: 0, role: "button", "aria-label": n.label }, svg);
+    if (n.circle) {
+      svgEl("circle", { cx: n.x, cy: n.y, r: 12 }, g);
+      svgEl("text", { x: n.x + (id === "end" ? 0 : 40), y: n.y + (id === "end" ? 30 : 5) }, g).textContent = n.label;
+    } else {
+      svgEl("rect", { x: n.x - n.w / 2, y: n.y - NODE_H / 2, width: n.w, height: NODE_H, rx: 10 }, g);
+      svgEl("text", { x: n.x, y: n.role ? n.y - 4 : n.y + 5 }, g).textContent = n.label;
+      if (n.role) {
+        svgEl("text", { x: n.x, y: n.y + 15, class: "sub", id: "m-" + id }, g);
+      }
+    }
+    const detailKey = n.role === "research" ? "research" : id;
+    g.addEventListener("click", () => select(detailKey));
+    g.addEventListener("keydown", ev => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        select(detailKey);
+      }
+    });
+  }
+}
+
+function paintModels() {
+  for (const [id, n] of Object.entries(NODES)) {
+    if (!n.role) {
+      continue;
+    }
+    const [model, effort] = seatFor(n.role);
+    const el = $("#m-" + id);
+    el.textContent = `${MODELS[model].name} · ${effort}`;
+    el.setAttribute("class", "sub m-" + model);
+  }
+}
+
+// ---- Node detail panel ----
+
+function select(key) {
+  selected = key;
+  document.querySelectorAll(".node").forEach(n => n.classList.remove("sel"));
+  const ids = key === "research" ? ["r1", "r2", "r3"] : [key];
+  ids.forEach(id => $("#n-" + id)?.classList.add("sel"));
+
+  const d = DETAILS[key];
+  const seat = seatFor(d.role);
+  const price = seat ? `<p class="label">${MODELS[seat[0]].id} · ${MODELS[seat[0]].price} per million tokens (in / out)</p>` : "";
+  $("#detail").innerHTML = `<h3>${d.title}</h3><p>${modelTag(d.role)}</p>${price}${d.body}`;
+}
+
+// ---- Scenario player ----
+
+function stateAt(index) {
+  const s = { route: "", findings: "", draft: "", verdict: "", revisions: "" };
+  SCENARIOS[scenario].steps.slice(0, index + 1).forEach(st => Object.assign(s, st.state || {}));
+  return s;
+}
+
+function render() {
+  const steps = SCENARIOS[scenario].steps;
+  const cur = steps[step];
+
+  // Highlight the current step's nodes and edges; dim nothing before the run starts.
+  document.querySelectorAll(".node").forEach(n => {
+    n.classList.remove("on", "dim");
+    if (cur) {
+      n.classList.add("dim");
+    }
+  });
+  document.querySelectorAll(".edge").forEach(e => e.classList.remove("on"));
+  if (cur) {
+    cur.on.forEach(id => $("#n-" + id).classList.replace("dim", "on"));
+    cur.edges.forEach(id => $("#e-" + id).classList.add("on"));
+  }
+
+  // Log: past lines muted, the current one highlighted.
+  const log = $("#log");
+  log.innerHTML = "";
+  steps.slice(0, step + 1).forEach((st, i) => {
+    const div = document.createElement("div");
+    div.className = i === step ? "cur" : "past";
+    div.textContent = st.log;
+    log.appendChild(div);
+  });
+  if (step < 0) {
+    log.textContent = "Press Play or Next to step through this turn.";
+  }
+  log.scrollTop = log.scrollHeight;
+
+  const s = stateAt(step);
+  $("#state").innerHTML = "<tr><th>field</th><th>value</th></tr>" + [
+    ["triage.route", s.route], ["findings", s.findings && s.findings + " finding(s)"],
+    ["draft", s.draft], ["review.verdict", s.verdict], ["revisions", s.revisions],
+  ].map(([k, v]) => `<tr><td><code>${k}</code></td><td>${v || "—"}</td></tr>`).join("");
+
+  $("#stepinfo").textContent = `step ${Math.max(step + 1, 0)} of ${steps.length}`;
+  $("#prev").disabled = step < 0;
+  $("#next").disabled = step >= steps.length - 1;
+  $("#play").textContent = timer ? "❚❚ Pause" : "▶ Play";
+}
+
+function stop() {
+  clearInterval(timer);
+  timer = null;
+}
+
+function go(delta) {
+  const last = SCENARIOS[scenario].steps.length - 1;
+  step = Math.min(Math.max(step + delta, -1), last);
+  if (step === last) {
+    stop();
+  }
+  render();
+}
+
+function togglePlay() {
+  if (timer) {
+    stop();
+    render();
+    return;
+  }
+  // Start over when the run already finished.
+  if (step >= SCENARIOS[scenario].steps.length - 1) {
+    step = -1;
+  }
+  timer = setInterval(() => go(1), PLAY_MS);
+  go(1);
+}
+
+// ---- Button groups ----
+
+function buttonGroup(container, options, current, onPick) {
+  const el = $(container);
+  el.innerHTML = "";
+  for (const [key, label] of options) {
+    const b = document.createElement("button");
+    b.className = "chip-btn";
+    b.textContent = label;
+    b.setAttribute("aria-pressed", String(key === current));
+    b.addEventListener("click", () => {
+      el.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", "false"));
+      b.setAttribute("aria-pressed", "true");
+      onPick(key);
+    });
+    el.appendChild(b);
+  }
+}
+
+// ---- Project map ----
+
+function drawMap() {
+  const root = $("#map");
+  let first = null;
+  for (const group of FILES) {
+    const title = document.createElement("div");
+    title.className = "group-title";
+    title.textContent = group.group;
+    root.appendChild(title);
+
+    const grid = document.createElement("div");
+    grid.className = "map";
+    for (const [name, short, long] of group.items) {
+      const b = document.createElement("button");
+      b.className = "card";
+      b.setAttribute("aria-pressed", "false");
+      b.innerHTML = `<b>${name}</b><span>${short}</span>`;
+      b.addEventListener("click", () => {
+        root.querySelectorAll(".card").forEach(c => c.setAttribute("aria-pressed", "false"));
+        b.setAttribute("aria-pressed", "true");
+        $("#file-detail").innerHTML = `<h3><code>${name}</code></h3><p><b>${short}</b></p><p>${long}</p>` + FLOW_NOTE;
+      });
+      grid.appendChild(b);
+      first = first || b;
+    }
+    root.appendChild(grid);
+  }
+  first.click();
+}
+
+const FLOW_NOTE = `
+  <h3 style="margin-top:16px">How the pieces connect</h3>
+  <p class="note">docs/*.md → retrieval.py → support_tools.py (search_policies) → 05 and 06.
+  common.py builds every model. 06 and eval_workflow.py report to Langfuse through tracing.py.
+  05 and 06 keep memory in chat.db.</p>
+  <h3>The three libraries</h3>
+  <ul>
+    <li><b>LangChain</b>: Claude models, tools, <code>create_agent</code>, middleware for call limits and refusal fallback.</li>
+    <li><b>LangGraph</b>: the graph, shared state, parallel <code>Send</code>, the revise loop, <code>interrupt()</code>, SQLite checkpoints.</li>
+    <li><b>Langfuse</b>: a trace per turn, cost per model, sessions per customer, scores, experiment runs.</li>
+  </ul>`;
+
+// ---- Results charts ----
+
+function bars(container, rows, fmt, max, highlight) {
+  $(container).innerHTML = rows.map(([label, v]) => `
+    <div>${label}</div>
+    <div><div class="bar ${label === highlight ? "" : "alt"}" style="width:${(v / max) * 100}%"></div></div>
+    <div class="num">${fmt(v)}</div>`).join("");
+}
+
+function showWorkflowMetric(key) {
+  const m = WF_EVAL[key];
+  const best = key === "judge" ? Math.max(...m.rows.map(r => r[1])) : Math.min(...m.rows.map(r => r[1]));
+  const bestLabel = m.rows.find(r => r[1] === best)[0];
+  bars("#wf-bars", m.rows, m.fmt, Math.max(...m.rows.map(r => r[1])), bestLabel);
+  $("#wf-note").textContent = m.title + ". " + m.note;
+}
+
+function showRetrieval(key) {
+  const r = RT_EVAL[key];
+  const best = r.rows.reduce((a, b) => (b[1] > a[1] ? b : a))[0];
+  bars("#rt-bars", r.rows, v => v.toFixed(2), 1, best);
+  $("#rt-note").textContent = r.note;
+}
+
+// ---- Tabs ----
+
+document.querySelectorAll("nav.tabs button").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll("nav.tabs button").forEach(t => t.setAttribute("aria-selected", String(t === tab)));
+    document.querySelectorAll("main > section").forEach(s => { s.hidden = s.id !== "tab-" + tab.dataset.tab; });
+  });
+});
+
+// ---- Start ----
+
+drawGraph();
+paintModels();
+select(selected);
+buttonGroup("#presets", [["mixed", "mixed"], ["opus", "all Opus"], ["haiku", "all Haiku"]], preset, key => {
+  preset = key;
+  paintModels();
+  select(selected);
+  $("#detail").insertAdjacentHTML("afterbegin", `<p class="note" style="margin-top:0">Preset ${key}: ${PRESETS[key].eval}</p>`);
+});
+buttonGroup("#scenarios", Object.entries(SCENARIOS).map(([k, s]) => [k, s.title]), scenario, key => {
+  stop();
+  scenario = key;
+  step = -1;
+  render();
+});
+$("#prev").addEventListener("click", () => { stop(); go(-1); });
+$("#next").addEventListener("click", () => { stop(); go(1); });
+$("#play").addEventListener("click", togglePlay);
+render();
+
+drawMap();
+buttonGroup("#metric", [["judge", "Judge"], ["cost", "Cost"], ["time", "Time"]], "judge", showWorkflowMetric);
+showWorkflowMetric("judge");
+buttonGroup("#qset", [["all", "All 24"], ["keyword", "Keyword 12"], ["paraphrase", "Paraphrase 12"]], "all", showRetrieval);
+showRetrieval("all");
+</script>
+</body>
+</html>

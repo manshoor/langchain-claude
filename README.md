@@ -20,6 +20,38 @@ Then the same bot is rebuilt as a LangGraph workflow that splits each turn acros
 
 Shared code: `common.py` builds the model and meters cost, `retrieval.py` holds loading, splitting and the three search methods, `support_tools.py` holds the tools 05 and 06 share, and `tracing.py` is the only file that talks to Langfuse.
 
+## How it fits together
+
+For an interactive version, open [`workflow.html`](workflow.html) in a browser. It steps through real workflow runs node by node, switches model presets and charts the eval results.
+
+```mermaid
+flowchart LR
+    subgraph learn["01–04: one idea per script"]
+        s1["01 chain"] --> s2["02 agent + tools"] --> s3["03 / 03b RAG"] --> s4["04 memory chat"]
+    end
+
+    s4 --> bot["05 support bot<br/>one Opus agent"]
+    bot --> wf["06 workflow<br/>4 roles, 3 models"]
+
+    subgraph shared["shared code"]
+        common["common.py<br/>models + cost meter"]
+        retrieval["retrieval.py<br/>BM25 / vector / hybrid"]
+        tools["support_tools.py<br/>search, ticket, today"]
+        tracing["tracing.py"]
+    end
+
+    docs[("docs/*.md<br/>11 policies")] --> retrieval
+    retrieval --> tools
+    tools --> bot & wf
+    common --> bot & wf
+    wf --> tracing --> langfuse["Langfuse<br/>traces, scores, experiments"]
+    bot & wf --> db[("chat.db<br/>memory per thread")]
+
+    evr["eval_retrieval.py<br/>offline, free"] --> retrieval
+    evw["eval_workflow.py<br/>paid, Opus judge"] --> bot & wf
+    evw --> tracing
+```
+
 ## Support bot architecture
 
 ```
@@ -82,6 +114,36 @@ handoff ────────────── interrupt "Open a ticket?" �
 
 memory:  SqliteSaver → chat.db, one thread per customer
 tracing: Langfuse, one trace per turn, every step and model call nested
+```
+
+One answered turn, in time order:
+
+```mermaid
+sequenceDiagram
+    actor C as Customer
+    participant T as Triage (Haiku)
+    participant R as Research ×N (Haiku)
+    participant D as docs/*.md
+    participant W as Writer (Opus)
+    participant V as Reviewer (Sonnet)
+
+    C->>T: message
+    T->>R: route "answer", 1–3 sub-questions
+    par one subagent per sub-question
+        R->>D: search_policies
+        D-->>R: passages
+    end
+    R->>W: notes + raw passages
+    W->>V: draft with [file.md] citations
+    alt pass
+        V-->>C: reply
+    else revise (once)
+        V->>W: problems to fix
+        W->>V: new draft
+    else not covered, or still failing
+        V-->>C: "Shall I open a ticket?" (graph pauses)
+        C->>V: yes → create_ticket
+    end
 ```
 
 What each library does:
@@ -216,7 +278,7 @@ Each script run makes a few API calls (cents at most). `eval_retrieval.py` and t
 ## Tests and CI
 
 ```sh
-uv run pytest     # 65 offline tests: tools, retrieval, graph routing, tracing, eval scoring
+uv run pytest     # 80 offline tests: tools, retrieval, graph routing, tracing, eval scoring
 uv run ruff check .
 ```
 
