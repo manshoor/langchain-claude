@@ -385,27 +385,27 @@ const RT_EVAL = {
 
 const FILES = [
   { group: "Learning path: one idea per script", items: [
-    ["01_chain.py", "Prompt → model → Pydantic", "A prompt template piped into the model, then structured output into a Pydantic model."],
-    ["02_agent.py", "create_agent + 3 tools", "The model decides which local <code>@tool</code> functions to call and when."],
-    ["03_rag.py", "RAG with BM25", "Load <code>docs/*.md</code>, split, keyword retrieval, answer with sources."],
-    ["03b_rag_vector.py", "RAG with vectors", "Local fastembed embeddings in an <code>InMemoryVectorStore</code>, similarity scores printed."],
-    ["04_memory_chat.py", "Memory per thread", "Multi-turn chat saved to <code>chat.db</code> (SQLite) per <code>--thread</code>; old turns summarized. Tools: today, web search, weather."],
+    ["scripts/01_chain.py", "Prompt → model → Pydantic", "A prompt template piped into the model, then structured output into a Pydantic model."],
+    ["scripts/02_agent.py", "create_agent + 3 tools", "The model decides which local <code>@tool</code> functions to call and when."],
+    ["scripts/03_rag.py", "RAG with BM25", "Load <code>docs/*.md</code>, split, keyword retrieval, answer with sources."],
+    ["scripts/03b_rag_vector.py", "RAG with vectors", "Local fastembed embeddings in an <code>InMemoryVectorStore</code>, similarity scores printed."],
+    ["scripts/04_memory_chat.py", "Memory per thread", "Multi-turn chat saved to <code>chat.db</code> (SQLite) per <code>--thread</code>; old turns summarized. Tools: today, web search, weather."],
   ]},
   { group: "The support bot, twice", items: [
-    ["05_support_bot.py", "One Opus agent, guarded", "02 + 03b + 04 in one agent: RAG as a tool, citations, memory, ticket hand-off. The agent decides every step; middleware hooks screen each message and guard each reply (Haiku), and let <code>create_ticket</code> run only after a clear yes."],
-    ["06_support_workflow.py", "LangGraph, 3 models", "A <code>StateGraph</code> where code fixes the steps and models fill them in: triage, parallel research, write, review, guard, consent pause. See the Workflow tab."],
+    ["scripts/05_support_bot.py", "One Opus agent, guarded", "02 + 03b + 04 in one agent: RAG as a tool, citations, memory, ticket hand-off. The agent decides every step; middleware hooks screen each message and guard each reply (Haiku), and let <code>create_ticket</code> run only after a clear yes."],
+    ["scripts/06_support_workflow.py", "LangGraph, 3 models", "A <code>StateGraph</code> where code fixes the steps and models fill them in: triage, parallel research, write, review, guard, consent pause. See the Workflow tab."],
   ]},
   { group: "Shared code", items: [
-    ["common.py", "Models + cost meter", "<code>make_model(model, effort)</code> with server-side fallback where supported; <code>UsageMeter</code> counts calls, tokens and dollars per model, thread-safe."],
-    ["retrieval.py", "Search methods", "Loading, splitting, and BM25, vector and hybrid (reciprocal rank fusion) search."],
-    ["support_tools.py", "Shared tools", "<code>search_policies</code>, <code>create_ticket</code>, <code>today</code>, used by 05 and 06."],
-    ["guardrails.py", "Prompt-injection defences", "The data rule, escaped <code>&lt;tags&gt;</code>, the guard prompt, the fixed texts and the consent check, shared by 05 and 06."],
-    ["tracing.py", "Langfuse, isolated", "The only file that talks to Langfuse: one trace per turn, scores, experiments. Does nothing without keys and never fails a turn."],
+    ["src/acme_support/common.py", "Models + cost meter", "<code>make_model(model, effort)</code> with server-side fallback where supported; <code>UsageMeter</code> counts calls, tokens and dollars per model, thread-safe."],
+    ["src/acme_support/retrieval.py", "Search methods", "Loading, splitting, and BM25, vector and hybrid (reciprocal rank fusion) search."],
+    ["src/acme_support/support_tools.py", "Shared tools", "<code>search_policies</code>, <code>create_ticket</code>, <code>today</code>, used by 05 and 06."],
+    ["src/acme_support/guardrails.py", "Prompt-injection defences", "The data rule, escaped <code>&lt;tags&gt;</code>, the guard prompt, the fixed texts and the consent check, shared by 05 and 06."],
+    ["src/acme_support/tracing.py", "Langfuse, isolated", "The only file that talks to Langfuse: one trace per turn, scores, experiments. Does nothing without keys and never fails a turn."],
   ]},
   { group: "Evals and tests", items: [
-    ["eval_retrieval.py", "Free, runs in CI", "BM25 vs vector vs hybrid on 24 labeled questions. Writes its table to the CI job summary."],
-    ["eval_workflow.py", "Paid, about $2", "05 vs 06 presets on 24 questions, graded by an Opus judge, run as Langfuse experiments."],
-    ["eval_guardrails.py", "Paid, $0.10 to $0.20", "13 prompt-injection attacks and 4 benign controls against 05 or 06, graded by code: no leaked prompt text, no planted phrase, no ticket opened, and the right outcome (decline, cited answer or fixed text)."],
+    ["evals/eval_retrieval.py", "Free, runs in CI", "BM25 vs vector vs hybrid on 24 labeled questions. Writes its table to the CI job summary."],
+    ["evals/eval_workflow.py", "Paid, about $2", "05 vs 06 presets on 24 questions, graded by an Opus judge, run as Langfuse experiments."],
+    ["evals/eval_guardrails.py", "Paid, $0.10 to $0.20", "13 prompt-injection attacks and 4 benign controls against 05 or 06, graded by code: no leaked prompt text, no planted phrase, no ticket opened, and the right outcome (decline, cited answer or fixed text)."],
     ["tests/", "171 offline tests", "Tools, retrieval, graph routing with fake roles, the 05 agent's guardrails with fake models, tracing, eval scoring. No model calls, so CI needs no secret."],
   ]},
   { group: "Data", items: [

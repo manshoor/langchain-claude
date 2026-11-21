@@ -13,6 +13,13 @@ dependencies = [
     "rank-bm25>=0.2.2",
 ]
 
+[build-system]
+requires = ["uv_build>=0.13.8,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "acme_support"  # shared code in src/acme_support/
+
 [dependency-groups]
 dev = [
     "pytest>=9.2.0",
@@ -21,8 +28,8 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Scripts live in the repo root, so tests import them from there.
-pythonpath = ["."]
+# Tests import the numbered scripts and the evals by file name.
+pythonpath = ["scripts", "evals"]
 
 [tool.ruff]
 line-length = 100

@@ -3,7 +3,7 @@
 Reads ANTHROPIC_API_KEY from the environment (ChatAnthropic does this itself).
 Override the model or effort per run:
 
-    LC_MODEL=claude-sonnet-5-5 LC_EFFORT=medium uv run 01_chain.py
+    LC_MODEL=claude-sonnet-5-5 LC_EFFORT=medium uv run scripts/01_chain.py
 
 Code that needs a specific model per role passes it in:
 

@@ -15,7 +15,7 @@
 !.python-version
 !*.py
 !docs/*.md
-!evals/*.json
+!evals/data/*.json
 !.github/workflows/*.yml
 
 # Never commit these, even if a rule above would match.

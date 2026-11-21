@@ -3,7 +3,7 @@
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-import guardrails
+from acme_support import guardrails
 
 
 @pytest.mark.parametrize(
