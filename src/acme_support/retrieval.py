@@ -23,7 +23,9 @@ from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from rank_bm25 import BM25Okapi
 
-DOCS_DIR = Path(__file__).parent / "docs"
+from acme_support.paths import ROOT
+
+DOCS_DIR = ROOT / "docs"
 EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 CHUNK_SIZE = 300
 CHUNK_OVERLAP = 30

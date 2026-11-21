@@ -11,7 +11,7 @@ embedding is matched to the nearest chunks.
 Embeddings run locally with fastembed (ONNX, no API key). The first run
 downloads the model, about 70 MB, into the fastembed cache.
 
-    uv run 03b_rag_vector.py "Can I get my money back after a month?"
+    uv run scripts/03b_rag_vector.py "Can I get my money back after a month?"
 """
 
 import sys
@@ -20,8 +20,8 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 
-from common import make_model
-from retrieval import format_chunks, load_chunks, vector_store
+from acme_support.common import make_model
+from acme_support.retrieval import format_chunks, load_chunks, vector_store
 
 TOP_K = 3
 

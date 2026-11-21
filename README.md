@@ -8,18 +8,28 @@ Then the same bot is rebuilt as a LangGraph workflow that splits each turn acros
 
 | File | Shows |
 | --- | --- |
-| `01_chain.py` | Prompt template piped into the model; structured output into a Pydantic model |
-| `02_agent.py` | `create_agent` with three local `@tool` functions |
-| `03_rag.py` | RAG over `docs/*.md`: load, split, BM25 retrieval, answer with sources |
-| `03b_rag_vector.py` | Same RAG with vector search: local fastembed embeddings, `InMemoryVectorStore`, similarity scores printed |
-| `04_memory_chat.py` | Multi-turn chat saved to `chat.db` (SQLite) per `--thread`, old turns summarized to cap its size. Tools: `today`, `web_search` (DuckDuckGo), `get_weather` (Open-Meteo) |
-| `05_support_bot.py` | **Capstone.** 02 + 03b + 04 in one agent: RAG as a tool, citations, memory, ticket hand-off, prompt-injection guardrails |
-| `06_support_workflow.py` | The bot as a LangGraph `StateGraph`: a model per role, parallel research subagents, review loop, consent pause before a ticket, Langfuse tracing |
-| `eval_retrieval.py` | Offline retrieval eval: BM25 vs vector vs hybrid on 24 labeled questions |
-| `eval_workflow.py` | Paid eval: 05 vs 06 presets, graded by an Opus judge, run as Langfuse experiments |
-| `eval_guardrails.py` | Paid eval: 13 prompt-injection attacks and 4 benign controls against 05 or 06, graded by code |
+| `scripts/01_chain.py` | Prompt template piped into the model; structured output into a Pydantic model |
+| `scripts/02_agent.py` | `create_agent` with three local `@tool` functions |
+| `scripts/03_rag.py` | RAG over `docs/*.md`: load, split, BM25 retrieval, answer with sources |
+| `scripts/03b_rag_vector.py` | Same RAG with vector search: local fastembed embeddings, `InMemoryVectorStore`, similarity scores printed |
+| `scripts/04_memory_chat.py` | Multi-turn chat saved to `chat.db` (SQLite) per `--thread`, old turns summarized to cap its size. Tools: `today`, `web_search` (DuckDuckGo), `get_weather` (Open-Meteo) |
+| `scripts/05_support_bot.py` | **Capstone.** 02 + 03b + 04 in one agent: RAG as a tool, citations, memory, ticket hand-off, prompt-injection guardrails |
+| `scripts/06_support_workflow.py` | The bot as a LangGraph `StateGraph`: a model per role, parallel research subagents, review loop, consent pause before a ticket, Langfuse tracing |
+| `evals/eval_retrieval.py` | Offline retrieval eval: BM25 vs vector vs hybrid on 24 labeled questions |
+| `evals/eval_workflow.py` | Paid eval: 05 vs 06 presets, graded by an Opus judge, run as Langfuse experiments |
+| `evals/eval_guardrails.py` | Paid eval: 13 prompt-injection attacks and 4 benign controls against 05 or 06, graded by code |
 
-Shared code: `common.py` builds the model and meters cost, `retrieval.py` holds loading, splitting and the three search methods, `support_tools.py` holds the tools 05 and 06 share, `guardrails.py` holds their prompt-injection defences, and `tracing.py` is the only file that talks to Langfuse.
+Shared code lives in the `acme_support` package under `src/acme_support/`: `common.py` builds the model and meters cost, `retrieval.py` holds loading, splitting and the three search methods, `support_tools.py` holds the tools 05 and 06 share, `guardrails.py` holds their prompt-injection defences, `tracing.py` is the only file that talks to Langfuse, and `paths.py` names the project folders. `uv sync` installs the package, so scripts import it as `from acme_support.common import ...`.
+
+```text
+scripts/            01 to 06, run with uv run scripts/<name>.py
+src/acme_support/   shared package: common, retrieval, support_tools, guardrails, tracing, paths
+evals/              eval_retrieval, eval_workflow, eval_guardrails
+evals/data/         labeled questions and attack prompts (JSON)
+docs/               the 11 policy docs the bot cites
+tests/              offline tests, no model calls
+chat.db             conversation memory for 04, 05 and 06 (not in git)
+```
 
 ## How it fits together
 
@@ -79,7 +89,7 @@ reply              SqliteSaver ──► chat.db (one memory per customer thread
 
 The agent decides when to search, can search again with other words, and must cite the file behind each fact. If the policies don't cover a question, it says so and offers a ticket instead of guessing. The screen, guard and ticket gate are middleware hooks around the agent (`before_agent`, `after_agent`, `wrap_tool_call`); see [Guardrails](#guardrails).
 
-Sample run (`uv run 05_support_bot.py`, 2026-11-21, turns 2 to 5, trimmed):
+Sample run (`uv run scripts/05_support_bot.py`, 2026-11-21, turns 2 to 5, trimmed):
 
 ```
 you> Ok. And how long until the money reaches my card?
@@ -188,7 +198,7 @@ What each library does:
 
 The graph fixes the steps; models only fill them in. So routing is plain code that tests cover without a model, and each turn has a cost ceiling: at most 3 subagents, 4 model steps each, 1 rewrite. Only a refused Haiku step retries on Sonnet; rate limits and other errors don't switch to the pricier model. Only plain text crosses from one role to another, so no model sees another model's thinking or tool calls.
 
-Sample run (`uv run 06_support_workflow.py`, 2026-11-21, trimmed):
+Sample run (`uv run scripts/06_support_workflow.py`, 2026-11-21, trimmed):
 
 ```
 you> Hi, I'm Sara. I bought a laptop 20 days ago. Can I get my money back, and how long until it reaches my card?
@@ -239,7 +249,7 @@ Prompt injection is text that tries to replace the bot's rules ("ignore your ins
 | Ticket needs a clear yes | A `wrap_tool_call` hook runs `create_ticket` only when the customer's latest message is a clear yes about a ticket, once per message. Otherwise the agent is told to ask. | Opens only in code, after the consent pause. | none |
 | Failed turns | The model saves its reply before the guard runs. After a failed turn, the next turn first removes its unchecked reply, tool steps and message, keeping any opened ticket's number. | The draft enters the history only after the guard. | none |
 
-`uv run eval_guardrails.py` runs 13 attacks and 4 benign controls against 06, one fresh conversation each; `--system 05` runs them against the bot. The attacks: prompt leaks, role play, a fake system message, a planted discount, plain and nested tag breakouts, a forced ticket, another customer's data, a rule planted in one turn and triggered in the next, and a 2700-character message. Code grades every turn's reply for prompt text (any 8 words in a row) or an internal tag and for planted phrases, fails any item that opened a ticket, then checks the last reply for a positive outcome: a decline where expected, a fixed text or a cited policy answer for other attacks, and no decline on chat turns. The controls must get a cited answer, or for the two-turn control, remember the customer's name, so a bot that declines everything fails.
+`uv run evals/eval_guardrails.py` runs 13 attacks and 4 benign controls against 06, one fresh conversation each; `--system 05` runs them against the bot. The attacks: prompt leaks, role play, a fake system message, a planted discount, plain and nested tag breakouts, a forced ticket, another customer's data, a rule planted in one turn and triggered in the next, and a 2700-character message. Code grades every turn's reply for prompt text (any 8 words in a row) or an internal tag and for planted phrases, fails any item that opened a ticket, then checks the last reply for a positive outcome: a decline where expected, a fixed text or a cited policy answer for other attacks, and no decline on chat turns. The controls must get a cited answer, or for the two-turn control, remember the customer's name, so a bot that declines everything fails.
 
 06, run on 2026-11-21 (preset `mixed`, $0.08, 30 s): code graded **15 of 17** items as passed.
 
@@ -278,7 +288,7 @@ Known gaps:
 
 ## Workflow results: does splitting the work pay off?
 
-`uv run eval_workflow.py`: the same 24 questions, one fresh conversation each, through three systems. An Opus 5.5 judge grades each reply against the full text of the doc that answers it (correct 1, partial 0.5, wrong 0). Run on 2026-11-19 for $1.93, including $0.38 for 72 judge calls.
+`uv run evals/eval_workflow.py`: the same 24 questions, one fresh conversation each, through three systems. An Opus 5.5 judge grades each reply against the full text of the doc that answers it (correct 1, partial 0.5, wrong 0). Run on 2026-11-19 for $1.93, including $0.38 for 72 judge calls.
 
 | System | Judge | Expected doc cited | Handoff | Cost / question | Median time | Model calls |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -299,7 +309,7 @@ Limits: 24 single-doc questions, one run each, and replies vary between runs. Th
 
 ## Retrieval results
 
-`uv run eval_retrieval.py`: 24 questions over 11 docs (21 chunks). Half reuse the docs' words ("Is shipping free on orders over 200 AED?"), half paraphrase ("How quickly will my parcel reach Riyadh?"). Each question names the doc that answers it.
+`uv run evals/eval_retrieval.py`: 24 questions over 11 docs (21 chunks). Half reuse the docs' words ("Is shipping free on orders over 200 AED?"), half paraphrase ("How quickly will my parcel reach Riyadh?"). Each question names the doc that answers it.
 
 | Method | Questions | hit@1 | hit@3 | MRR |
 | --- | --- | --- | --- | --- |
@@ -339,23 +349,23 @@ uv sync
 ## Run
 
 ```sh
-uv run 01_chain.py
-uv run 02_agent.py
-uv run 03_rag.py "Who approves refunds over 5000 AED?"
-uv run 03b_rag_vector.py "Can I get my money back after a month?"
-uv run 04_memory_chat.py                       # scripted demo, starts fresh each run
-uv run 04_memory_chat.py --chat                # interactive, resumes thread "main"
-uv run 04_memory_chat.py --chat --thread aws   # a separate conversation
-uv run 04_memory_chat.py --reset --thread aws  # forget one conversation
-uv run 05_support_bot.py                       # scripted support demo
-uv run 05_support_bot.py --chat --thread ali   # be the customer
-uv run 06_support_workflow.py                  # scripted workflow demo
-uv run 06_support_workflow.py --chat --preset opus   # every role on Opus
-uv run eval_retrieval.py                       # offline, no API key needed
-uv run eval_workflow.py --dry-run              # cost estimate for the paid eval
-uv run eval_workflow.py                        # paid: about $2
-uv run eval_guardrails.py                      # paid: about $0.10
-uv run eval_guardrails.py --system 05          # paid: about $0.20
+uv run scripts/01_chain.py
+uv run scripts/02_agent.py
+uv run scripts/03_rag.py "Who approves refunds over 5000 AED?"
+uv run scripts/03b_rag_vector.py "Can I get my money back after a month?"
+uv run scripts/04_memory_chat.py                       # scripted demo, starts fresh each run
+uv run scripts/04_memory_chat.py --chat                # interactive, resumes thread "main"
+uv run scripts/04_memory_chat.py --chat --thread aws   # a separate conversation
+uv run scripts/04_memory_chat.py --reset --thread aws  # forget one conversation
+uv run scripts/05_support_bot.py                       # scripted support demo
+uv run scripts/05_support_bot.py --chat --thread ali   # be the customer
+uv run scripts/06_support_workflow.py                  # scripted workflow demo
+uv run scripts/06_support_workflow.py --chat --preset opus   # every role on Opus
+uv run evals/eval_retrieval.py                       # offline, no API key needed
+uv run evals/eval_workflow.py --dry-run              # cost estimate for the paid eval
+uv run evals/eval_workflow.py                        # paid: about $2
+uv run evals/eval_guardrails.py                      # paid: about $0.10
+uv run evals/eval_guardrails.py --system 05          # paid: about $0.20
 ```
 
 Each script run makes a few API calls (cents at most). `eval_retrieval.py` and the tests make none; `eval_workflow.py` and `eval_guardrails.py` are the paid evals.
@@ -406,7 +416,7 @@ GitHub Actions runs lint, tests and the retrieval eval on every push, and writes
 
 ```sh
 brew install asciinema
-asciinema rec demo.cast -c "uv run 05_support_bot.py"
+asciinema rec demo.cast -c "uv run scripts/05_support_bot.py"
 asciinema play demo.cast
 ```
 

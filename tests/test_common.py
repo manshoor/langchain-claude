@@ -2,7 +2,7 @@
 
 import pytest
 
-import common
+from acme_support import common
 
 HAIKU = "claude-haiku-5-5"
 SONNET = "claude-sonnet-5-5"

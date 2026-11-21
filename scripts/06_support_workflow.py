@@ -37,10 +37,10 @@
 - Graph state holds only plain values (dicts, strings, messages), so the
   checkpoint loads without registering custom classes.
 
-    uv run 06_support_workflow.py                         # scripted demo, starts fresh
-    uv run 06_support_workflow.py --chat                  # interactive, thread "workflow"
-    uv run 06_support_workflow.py --chat --preset opus    # every role on Opus 5.5
-    uv run 06_support_workflow.py --reset --thread ali    # forget one customer
+    uv run scripts/06_support_workflow.py                         # scripted demo, starts fresh
+    uv run scripts/06_support_workflow.py --chat                  # interactive, thread "workflow"
+    uv run scripts/06_support_workflow.py --chat --preset opus    # every role on Opus 5.5
+    uv run scripts/06_support_workflow.py --reset --thread ali    # forget one customer
 """
 
 import argparse
@@ -52,7 +52,6 @@ from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
 from functools import partial
-from pathlib import Path
 from typing import Annotated, Any, TypedDict
 
 from anthropic import APIError
@@ -80,9 +79,9 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.types import Command, Overwrite, Send, interrupt
 
-import tracing
-from common import SERVER_FALLBACK_MODELS, Effort, UsageMeter, make_model
-from guardrails import (
+from acme_support import tracing
+from acme_support.common import SERVER_FALLBACK_MODELS, Effort, UsageMeter, make_model
+from acme_support.guardrails import (
     DATA_RULE,
     DECLINE_TEXT,
     DECLINED_PLACEHOLDER,
@@ -94,10 +93,10 @@ from guardrails import (
     is_yes,
     tagged,
 )
-from retrieval import load_chunks, vector_store
-from support_tools import Priority, create_ticket, search_tool, today
+from acme_support.paths import DB_PATH
+from acme_support.retrieval import load_chunks, vector_store
+from acme_support.support_tools import Priority, create_ticket, search_tool, today
 
-DB_PATH = Path(__file__).parent / "chat.db"
 DEMO_THREAD = "workflow-demo"
 DEFAULT_THREAD = "workflow"
 THREAD_PREFIX = "06:"  # keeps 06 threads apart from 04/05 threads in the same chat.db

@@ -1,6 +1,6 @@
 """Measure retrieval quality: BM25 vs vector vs hybrid, offline.
 
-Each question in evals/retrieval_questions.json names the doc that answers it.
+Each question in evals/data/retrieval_questions.json names the doc that answers it.
 For every method, rank the docs for each question and score where the right
 one lands:
 
@@ -10,16 +10,23 @@ one lands:
 
 No API calls, so it is free and gives the same numbers on every run.
 
-    uv run eval_retrieval.py
+    uv run evals/eval_retrieval.py
 """
 
 import json
 from enum import StrEnum
-from pathlib import Path
 
-from retrieval import Search, bm25_search, hybrid_search, load_chunks, vector_search, vector_store
+from acme_support.paths import DATA_DIR
+from acme_support.retrieval import (
+    Search,
+    bm25_search,
+    hybrid_search,
+    load_chunks,
+    vector_search,
+    vector_store,
+)
 
-QUESTIONS_PATH = Path(__file__).parent / "evals" / "retrieval_questions.json"
+QUESTIONS_PATH = DATA_DIR / "retrieval_questions.json"
 HIT_DEPTHS = (1, 3)
 
 

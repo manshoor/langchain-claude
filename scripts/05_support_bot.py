@@ -30,17 +30,16 @@
   (guardrails.py, shared with 06). A declined message is replaced in the
   history, so later turns never read it.
 
-    uv run 05_support_bot.py                       # scripted demo, starts fresh
-    uv run 05_support_bot.py --chat                # interactive, resumes thread "support"
-    uv run 05_support_bot.py --chat --thread ali   # a separate customer
-    uv run 05_support_bot.py --reset --thread ali  # forget one customer
+    uv run scripts/05_support_bot.py                       # scripted demo, starts fresh
+    uv run scripts/05_support_bot.py --chat                # interactive, resumes thread "support"
+    uv run scripts/05_support_bot.py --chat --thread ali   # a separate customer
+    uv run scripts/05_support_bot.py --reset --thread ali  # forget one customer
 """
 
 import argparse
 from collections.abc import Callable
 from enum import StrEnum
 from itertools import takewhile
-from pathlib import Path
 from typing import Annotated, Any, NotRequired, TypedDict
 
 from langchain.agents import create_agent
@@ -70,8 +69,8 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph.message import add_messages
 from langgraph.types import Command
 
-from common import Effort, make_model
-from guardrails import (
+from acme_support.common import Effort, make_model
+from acme_support.guardrails import (
     DATA_RULE,
     DECLINE_TEXT,
     DECLINED_PLACEHOLDER,
@@ -83,10 +82,10 @@ from guardrails import (
     is_yes,
     transcript,
 )
-from retrieval import load_chunks, vector_store
-from support_tools import create_ticket, search_tool, today
+from acme_support.paths import DB_PATH
+from acme_support.retrieval import load_chunks, vector_store
+from acme_support.support_tools import create_ticket, search_tool, today
 
-DB_PATH = Path(__file__).parent / "chat.db"
 DEMO_THREAD = "support-demo"
 DEFAULT_THREAD = "support"
 

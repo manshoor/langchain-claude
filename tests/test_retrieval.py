@@ -4,7 +4,7 @@ import importlib
 
 from langchain_core.documents import Document
 
-from retrieval import bm25_search, format_chunks, hybrid_search, load_chunks, tokenize
+from acme_support.retrieval import bm25_search, format_chunks, hybrid_search, load_chunks, tokenize
 
 eval_retrieval = importlib.import_module("eval_retrieval")
 
