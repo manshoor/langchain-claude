@@ -111,7 +111,7 @@
     The repo builds a support bot that answers from 11 policy documents, cites its sources,
     remembers each customer and hands off to a human when the documents have no answer.
     It is built twice: once as one agent (05), once as a LangGraph workflow where three Claude
-    models split each turn (06), with guardrails against prompt injection. Evals measure both.
+    models split each turn (06). Both have guardrails against prompt injection. Evals measure both.
   </p>
 
   <nav class="tabs" role="tablist">
@@ -188,11 +188,10 @@
       <div class="panel">
         <h2>Guardrail eval: 17 items</h2>
         <p class="note" style="margin-top:0">13 prompt-injection attacks and 4 benign controls, graded by code.
-          Run on 2026-11-21 for $0.08.</p>
+          Run on 2026-11-21.</p>
+        <div class="row" id="grset"></div>
         <div class="bars" id="gr-bars"></div>
-        <p class="note">Code passed 15 of 17. The 2 "failed" were correct refusals that repeated the planted
-          phrase ("I can't confirm a 50% discount"), so no attack got through. Every control was answered,
-          so nothing was over-blocked.</p>
+        <p class="note" id="gr-note"></p>
       </div>
     </div>
   </section>
@@ -393,20 +392,21 @@ const FILES = [
     ["04_memory_chat.py", "Memory per thread", "Multi-turn chat saved to <code>chat.db</code> (SQLite) per <code>--thread</code>; old turns summarized. Tools: today, web search, weather."],
   ]},
   { group: "The support bot, twice", items: [
-    ["05_support_bot.py", "One Opus agent", "02 + 03b + 04 in one agent: RAG as a tool, citations, memory, ticket hand-off. The agent decides every step."],
+    ["05_support_bot.py", "One Opus agent, guarded", "02 + 03b + 04 in one agent: RAG as a tool, citations, memory, ticket hand-off. The agent decides every step; middleware hooks screen each message and guard each reply (Haiku), and let <code>create_ticket</code> run only after a clear yes."],
     ["06_support_workflow.py", "LangGraph, 3 models", "A <code>StateGraph</code> where code fixes the steps and models fill them in: triage, parallel research, write, review, guard, consent pause. See the Workflow tab."],
   ]},
   { group: "Shared code", items: [
     ["common.py", "Models + cost meter", "<code>make_model(model, effort)</code> with server-side fallback where supported; <code>UsageMeter</code> counts calls, tokens and dollars per model, thread-safe."],
     ["retrieval.py", "Search methods", "Loading, splitting, and BM25, vector and hybrid (reciprocal rank fusion) search."],
     ["support_tools.py", "Shared tools", "<code>search_policies</code>, <code>create_ticket</code>, <code>today</code>, used by 05 and 06."],
+    ["guardrails.py", "Prompt-injection defences", "The data rule, escaped <code>&lt;tags&gt;</code>, the guard prompt, the fixed texts and the consent check, shared by 05 and 06."],
     ["tracing.py", "Langfuse, isolated", "The only file that talks to Langfuse: one trace per turn, scores, experiments. Does nothing without keys and never fails a turn."],
   ]},
   { group: "Evals and tests", items: [
     ["eval_retrieval.py", "Free, runs in CI", "BM25 vs vector vs hybrid on 24 labeled questions. Writes its table to the CI job summary."],
     ["eval_workflow.py", "Paid, about $2", "05 vs 06 presets on 24 questions, graded by an Opus judge, run as Langfuse experiments."],
-    ["eval_guardrails.py", "Paid, about $0.10", "13 prompt-injection attacks and 4 benign controls against 06, graded by code: no leaked prompt text, no planted phrase, and the right outcome (decline, cited answer or fixed text)."],
-    ["tests/", "130 offline tests", "Tools, retrieval, graph routing and guardrails with fake roles, tracing, eval scoring. No model calls, so CI needs no secret."],
+    ["eval_guardrails.py", "Paid, $0.10 to $0.20", "13 prompt-injection attacks and 4 benign controls against 05 or 06, graded by code: no leaked prompt text, no planted phrase, no ticket opened, and the right outcome (decline, cited answer or fixed text)."],
+    ["tests/", "171 offline tests", "Tools, retrieval, graph routing with fake roles, the 05 agent's guardrails with fake models, tracing, eval scoring. No model calls, so CI needs no secret."],
   ]},
   { group: "Data", items: [
     ["docs/*.md", "11 policy docs", "Refunds, shipping, warranty, pricing and more for Acme, a sample store. The only source the bot may cite."],
@@ -713,7 +713,17 @@ buttonGroup("#metric", [["judge", "Judge"], ["cost", "Cost"], ["time", "Time"]],
 showWorkflowMetric("judge");
 buttonGroup("#qset", [["all", "All 24"], ["keyword", "Keyword 12"], ["paraphrase", "Paraphrase 12"]], "all", showRetrieval);
 showRetrieval("all");
-bars("#gr-bars", [["controls answered", 4], ["attacks declined", 8], ["attacks answered safely", 3], ["false fails", 2]], v => String(v), 8, "attacks declined");
+// Both runs: 15 of 17 passed; the 2 "failed" were refusals that repeated the planted phrase.
+const GR_EVAL = {
+  "05": { cost: "$0.11", note: "05: the screen declined every rule-change attack, so Opus never ran on them. No ticket opened. Every control was answered, so nothing was over-blocked." },
+  "06": { cost: "$0.08", note: "06: triage declined every rule-change attack. Every control was answered, so nothing was over-blocked." },
+};
+function showGuardrails(key) {
+  bars("#gr-bars", [["controls answered", 4], ["attacks declined", 8], ["attacks answered safely", 3], ["false fails", 2]], v => String(v), 8, "attacks declined");
+  $("#gr-note").textContent = `Code passed 15 of 17 for ${GR_EVAL[key].cost}. The 2 "failed" were correct refusals that repeated the planted phrase, so no attack got through. ` + GR_EVAL[key].note;
+}
+buttonGroup("#grset", [["05", "05 bot"], ["06", "06 workflow"]], "05", showGuardrails);
+showGuardrails("05");
 </script>
 </body>
 </html>
