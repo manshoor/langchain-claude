@@ -19,17 +19,42 @@ Then the same bot is rebuilt as a LangGraph workflow that splits each turn acros
 | `evals/eval_workflow.py` | Paid eval: 05 vs 06 presets, graded by an Opus judge, run as Langfuse experiments |
 | `evals/eval_guardrails.py` | Paid eval: 13 prompt-injection attacks and 4 benign controls against 05 or 06, graded by code |
 
-Shared code lives in the `acme_support` package under `src/acme_support/`: `common.py` builds the model and meters cost, `retrieval.py` holds loading, splitting and the three search methods, `support_tools.py` holds the tools 05 and 06 share, `guardrails.py` holds their prompt-injection defences, `tracing.py` is the only file that talks to Langfuse, and `paths.py` names the project folders. `uv sync` installs the package, so scripts import it as `from acme_support.common import ...`.
+## Project layout
 
 ```text
-scripts/            01 to 06, run with uv run scripts/<name>.py
-src/acme_support/   shared package: common, retrieval, support_tools, guardrails, tracing, paths
-evals/              eval_retrieval, eval_workflow, eval_guardrails
-evals/data/         labeled questions and attack prompts (JSON)
-docs/               the 11 policy docs the bot cites
-tests/              offline tests, no model calls
-chat.db             conversation memory for 04, 05 and 06 (not in git)
+langchain-claude/
+├── scripts/                     numbered learning path, run with uv run scripts/<name>.py
+│   ├── 01_chain.py
+│   ├── 02_agent.py
+│   ├── 03_rag.py
+│   ├── 03b_rag_vector.py
+│   ├── 04_memory_chat.py
+│   ├── 05_support_bot.py        capstone: one guarded agent
+│   └── 06_support_workflow.py   the bot as a LangGraph workflow
+├── src/acme_support/            shared package, installed by uv sync
+│   ├── common.py                builds the model, meters cost
+│   ├── retrieval.py             loading, splitting, BM25 / vector / hybrid search
+│   ├── support_tools.py         tools shared by 05 and 06
+│   ├── guardrails.py            prompt-injection defences shared by 05 and 06
+│   ├── tracing.py               the only file that talks to Langfuse
+│   └── paths.py                 project folders, chat.db path, load_script()
+├── evals/                       run with uv run evals/<name>.py
+│   ├── eval_retrieval.py        free, runs in CI
+│   ├── eval_workflow.py         paid: 05 vs 06, Opus judge
+│   ├── eval_guardrails.py       paid: attacks against 05 or 06
+│   └── data/
+│       ├── retrieval_questions.json   24 labeled questions
+│       └── attack_prompts.json        13 attacks, 4 benign controls
+├── docs/                        11 policy docs, the only source the bot may cite
+├── tests/                       offline pytest suite, no model calls
+├── .github/workflows/ci.yml     tests, ruff, retrieval eval
+├── workflow.html                interactive walkthrough, open in a browser
+├── pyproject.toml               dependencies, package build, pytest and ruff settings
+├── chat.db                      conversation memory for 04, 05 and 06 (not in git)
+└── .env                         API keys (not in git)
 ```
+
+Scripts import shared code from the package, for example `from acme_support.common import make_model`. Tests import the numbered scripts and the evals by file name, through `pythonpath = ["scripts", "evals"]` in `pyproject.toml`. The evals load 05 and 06 with `acme_support.paths.load_script`, because names that start with a digit can't be imported directly.
 
 ## How it fits together
 
