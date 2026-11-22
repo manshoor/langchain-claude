@@ -7,7 +7,7 @@ Retrieval here is BM25 (keyword ranking) via the rank-bm25 package: no
 embedding model, no extra API key. 03b_rag_vector.py is the vector search
 version. Both use the shared code in retrieval.py.
 
-    uv run 03_rag.py "How long do refunds take?"
+    uv run scripts/03_rag.py "How long do refunds take?"
 """
 
 import sys
@@ -16,8 +16,8 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 
-from common import make_model
-from retrieval import bm25_search, format_chunks, load_chunks
+from acme_support.common import make_model
+from acme_support.retrieval import bm25_search, format_chunks, load_chunks
 
 TOP_K = 3
 DEFAULT_QUESTION = "How long do refunds take, and who approves refunds over 5000 AED?"

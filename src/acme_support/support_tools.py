@@ -6,7 +6,7 @@ from enum import StrEnum
 from langchain_core.tools import BaseTool, tool
 from langchain_core.vectorstores import InMemoryVectorStore
 
-from retrieval import format_chunks
+from acme_support.retrieval import format_chunks
 
 TOP_K = 3
 

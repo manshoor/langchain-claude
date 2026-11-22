@@ -12,16 +12,15 @@ Tools: today (local clock), web_search (DuckDuckGo), get_weather (Open-Meteo).
 - Size cap: once a thread reaches SUMMARY_TRIGGER messages, the older ones
   are replaced by a summary and only the last SUMMARY_KEEP stay word for word.
 
-    uv run 04_memory_chat.py                      # scripted demo, starts fresh
-    uv run 04_memory_chat.py --chat               # resume thread "main"
-    uv run 04_memory_chat.py --chat --thread aws  # a separate conversation
-    uv run 04_memory_chat.py --reset --thread aws # forget one thread
+    uv run scripts/04_memory_chat.py                      # scripted demo, starts fresh
+    uv run scripts/04_memory_chat.py --chat               # resume thread "main"
+    uv run scripts/04_memory_chat.py --chat --thread aws  # a separate conversation
+    uv run scripts/04_memory_chat.py --reset --thread aws # forget one thread
 """
 
 import argparse
 import json
 from datetime import date
-from pathlib import Path
 from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
@@ -33,9 +32,9 @@ from langchain.agents.middleware import SummarizationMiddleware
 from langchain_core.tools import tool
 from langgraph.checkpoint.sqlite import SqliteSaver
 
-from common import make_model
+from acme_support.common import make_model
+from acme_support.paths import DB_PATH
 
-DB_PATH = Path(__file__).parent / "chat.db"
 SEARCH_RESULTS = 5
 
 # Open-Meteo: free weather API, no key. City name -> coordinates -> weather.

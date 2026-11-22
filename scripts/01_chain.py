@@ -1,13 +1,13 @@
 """Prompt template | model | parser, then structured output.
 
-    uv run 01_chain.py
+    uv run scripts/01_chain.py
 """
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from common import make_model
+from acme_support.common import make_model
 
 # Part A: a plain text chain. The "|" operator pipes each step into the next.
 explain_prompt = ChatPromptTemplate.from_messages(

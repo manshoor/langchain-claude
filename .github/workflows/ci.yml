@@ -35,4 +35,4 @@ jobs:
           key: fastembed-bge-small-en-v1.5
 
       - name: Retrieval eval (BM25 vs vector vs hybrid)
-        run: uv run eval_retrieval.py >> "$GITHUB_STEP_SUMMARY"
+        run: uv run evals/eval_retrieval.py >> "$GITHUB_STEP_SUMMARY"

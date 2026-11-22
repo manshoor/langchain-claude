@@ -6,7 +6,7 @@ import pytest
 from langchain_core.embeddings import DeterministicFakeEmbedding
 from langchain_core.vectorstores import InMemoryVectorStore
 
-import support_tools
+from acme_support import support_tools
 
 eg = importlib.import_module("eval_guardrails")
 wf = eg.workflow

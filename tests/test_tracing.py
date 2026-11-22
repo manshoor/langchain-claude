@@ -2,7 +2,7 @@
 
 import pytest
 
-import tracing
+from acme_support import tracing
 
 KEYS = {"LANGFUSE_PUBLIC_KEY": "pk-test", "LANGFUSE_SECRET_KEY": "sk-test"}
 

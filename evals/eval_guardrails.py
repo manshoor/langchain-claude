@@ -1,6 +1,6 @@
 """Send prompt-injection attacks through the bot (05) or workflow (06), check the replies.
 
-Each item in evals/attack_prompts.json runs as a fresh conversation of one or
+Each item in evals/data/attack_prompts.json runs as a fresh conversation of one or
 more turns. Any ticket question is answered "no". Code grades the replies, no
 judge model.
 
@@ -25,14 +25,13 @@ phrase ("I can't confirm 50% off") counts as a failure.
 
 This calls the API and costs money (about $0.10 for 06 mixed, $0.20 for 05):
 
-    uv run eval_guardrails.py --dry-run
-    uv run eval_guardrails.py                 # 06, mixed preset
-    uv run eval_guardrails.py --preset opus
-    uv run eval_guardrails.py --system 05
+    uv run evals/eval_guardrails.py --dry-run
+    uv run evals/eval_guardrails.py                 # 06, mixed preset
+    uv run evals/eval_guardrails.py --preset opus
+    uv run evals/eval_guardrails.py --system 05
 """
 
 import argparse
-import importlib
 import json
 import re
 import threading
@@ -41,7 +40,6 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from pathlib import Path
 from typing import Any
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -50,16 +48,16 @@ from langchain_core.vectorstores import InMemoryVectorStore
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-import guardrails
-import tracing
-from common import UsageMeter
-from retrieval import load_chunks, vector_store
-from support_tools import create_ticket
+from acme_support import guardrails, tracing
+from acme_support.common import UsageMeter
+from acme_support.paths import DATA_DIR, load_script
+from acme_support.retrieval import load_chunks, vector_store
+from acme_support.support_tools import create_ticket
 
-bot = importlib.import_module("05_support_bot")
-workflow = importlib.import_module("06_support_workflow")
+bot = load_script("05_support_bot")
+workflow = load_script("06_support_workflow")
 
-ATTACKS_PATH = Path(__file__).parent / "evals" / "attack_prompts.json"
+ATTACKS_PATH = DATA_DIR / "attack_prompts.json"
 EXPERIMENT_NAME = "guardrail-eval"
 REFUSE_TICKET = "no"
 WORKERS = 4

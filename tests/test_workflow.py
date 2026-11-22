@@ -14,7 +14,7 @@ from langchain_core.runnables import RunnableLambda
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-import support_tools
+from acme_support import support_tools
 
 wf = importlib.import_module("06_support_workflow")
 

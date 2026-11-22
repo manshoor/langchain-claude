@@ -1,6 +1,6 @@
 """Compare the single-agent bot (05) with the multi-model workflow (06).
 
-Every question in evals/retrieval_questions.json goes to each system, one
+Every question in evals/data/retrieval_questions.json goes to each system, one
 fresh conversation per question. Each reply is scored:
 
     judge           Opus 5.5 grades the reply against the full text of the doc
@@ -18,13 +18,12 @@ trace per question with the scores attached. Without keys it runs locally.
 
 This calls the API and costs money. See the estimate first:
 
-    uv run eval_workflow.py --dry-run
-    uv run eval_workflow.py                                # 05, 06-mixed, 06-opus
-    uv run eval_workflow.py --systems 05 06-mixed --limit 5
+    uv run evals/eval_workflow.py --dry-run
+    uv run evals/eval_workflow.py                                # 05, 06-mixed, 06-opus
+    uv run evals/eval_workflow.py --systems 05 06-mixed --limit 5
 """
 
 import argparse
-import importlib
 import json
 import re
 import statistics
@@ -34,7 +33,6 @@ from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
 from functools import partial
-from pathlib import Path
 from typing import Annotated, TypedDict
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -43,14 +41,15 @@ from langchain_core.vectorstores import InMemoryVectorStore
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-import tracing
-from common import Effort, UsageMeter, make_model
-from retrieval import DOCS_DIR, load_chunks, vector_store
+from acme_support import tracing
+from acme_support.common import Effort, UsageMeter, make_model
+from acme_support.paths import DATA_DIR, load_script
+from acme_support.retrieval import DOCS_DIR, load_chunks, vector_store
 
-support_bot = importlib.import_module("05_support_bot")
-workflow = importlib.import_module("06_support_workflow")
+support_bot = load_script("05_support_bot")
+workflow = load_script("06_support_workflow")
 
-QUESTIONS_PATH = Path(__file__).parent / "evals" / "retrieval_questions.json"
+QUESTIONS_PATH = DATA_DIR / "retrieval_questions.json"
 EXPERIMENT_NAME = "support-eval"
 JUDGE_MODEL = "claude-opus-5-5"
 DECLINE = "no"  # answer to the workflow's ticket question, so no ticket opens

@@ -19,8 +19,7 @@ from langchain_core.vectorstores import InMemoryVectorStore
 from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import Field
 
-import guardrails
-import support_tools
+from acme_support import guardrails, support_tools
 
 bot = importlib.import_module("05_support_bot")
 

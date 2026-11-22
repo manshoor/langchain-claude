@@ -1,6 +1,6 @@
 """An agent that decides which local tools to call.
 
-    uv run 02_agent.py
+    uv run scripts/02_agent.py
 """
 
 from datetime import date
@@ -9,7 +9,7 @@ from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.tools import tool
 
-from common import make_model
+from acme_support.common import make_model
 
 # Fake data so the script runs offline (apart from the model call).
 EXCHANGE_RATES = {"USD": 3.6725, "EUR": 4.25, "GBP": 4.95}  # AED per unit
