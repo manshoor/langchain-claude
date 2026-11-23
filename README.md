@@ -332,7 +332,7 @@ What the numbers show:
 - **The review gate costs answers.** "Can I ring you on a Friday?" found nothing in research, the reviewer said "not covered", and the customer got a handoff instead of the phone hours. The same gate stops invented answers; here it was too cautious.
 - **Where 06 should help, this set doesn't test:** multi-part questions, real gaps in the docs (05 asks for consent in its reply; 06 pauses the graph and opens the ticket in code), and an audit trail of every step.
 
-These numbers were measured before the guardrails were added. 05 ran again with them on 2026-11-21 ($0.43): judge 0.90, expected doc cited 100%, no handoffs, $0.0129 per question, 6.1 s median, 4.0 model calls. Same grade and nothing blocked; the screen and guard cost about 4% more and 2.6 s per turn. 06 was not run again, and neither system has been run on these questions since the stricter ticket consent check.
+These numbers were measured before the guardrails were added. 05 ran again with them on 2026-11-21 ($0.43): judge 0.90, expected doc cited 100%, no handoffs, $0.0129 per question, 6.1 s median, 4.0 model calls. Same grade and nothing blocked; the screen and guard cost about 4% more and 2.6 s per turn. After the stricter ticket consent check, 05 ran again on 2026-11-23 ($0.44): judge 0.90, expected doc cited 100%, no handoffs, $0.0129 per question, 6.2 s median, 4.0 model calls. 06 was not run again.
 
 Limits: 24 single-doc questions, one run each, and replies vary between runs. The judge is Opus grading replies Opus wrote; grading against the doc text reduces that bias. The judge sees only the expected doc, so a correct fact cited from a second doc counts as unsupported, which hurt both systems.
 
