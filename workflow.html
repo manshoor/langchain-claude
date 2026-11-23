@@ -295,7 +295,7 @@ const DETAILS = {
   handoff: { title: "handoff", body: `
     <p>Plain code. Calls <code>interrupt()</code>: the graph saves its state and pauses until the customer answers.
     The CLI resumes it with <code>Command(resume=answer)</code>.</p>
-    <p>A clear yes opens a ticket with <code>create_ticket</code>. Any refusal word ("ok, no thanks") opens nothing.</p>` },
+    <p>A clear yes opens a ticket with <code>create_ticket</code>. A refusal ("ok, no thanks") opens nothing. An unclear answer ("please explain first") is asked once more; a second one opens nothing.</p>` },
   end: { title: "END", body: "<p>The turn ends. The meter prints cost and model calls; with Langfuse keys the turn is one trace, with scores for route, verdict, guard, revisions and sources cited.</p>" },
 };
 
@@ -393,7 +393,7 @@ const FILES = [
     ["scripts/04_memory_chat.py", "Memory per thread", "Multi-turn chat saved to <code>chat.db</code> (SQLite) per <code>--thread</code>; old turns summarized. Tools: today, web search, weather."],
   ]},
   { folder: "scripts/", group: "The support bot, twice", items: [
-    ["scripts/05_support_bot.py", "One Opus agent, guarded", "02 + 03b + 04 in one agent: RAG as a tool, citations, memory, ticket hand-off. The agent decides every step; middleware hooks screen each message and guard each reply (Haiku), and let <code>create_ticket</code> run only after a clear yes."],
+    ["scripts/05_support_bot.py", "One Opus agent, guarded", "02 + 03b + 04 in one agent: RAG as a tool, citations, memory, ticket hand-off. The agent decides every step; middleware hooks screen each message and guard each reply (Haiku), and let <code>create_ticket</code> run only when the customer asks for a ticket or says yes to one."],
     ["scripts/06_support_workflow.py", "LangGraph, 3 models", "A <code>StateGraph</code> where code fixes the steps and models fill them in: triage, parallel research, write, review, guard, consent pause. See the Workflow tab."],
   ]},
   { folder: "src/acme_support/", group: "Shared package, installed by uv sync", items: [
@@ -411,7 +411,7 @@ const FILES = [
     ["evals/data/*.json", "Eval inputs", "<code>retrieval_questions.json</code>: 24 labeled questions. <code>attack_prompts.json</code>: 13 attacks and 4 benign controls."],
   ]},
   { folder: "./", group: "Project root", items: [
-    ["tests/", "171 offline tests", "Tools, retrieval, graph routing with fake roles, the 05 agent's guardrails with fake models, tracing, eval scoring. No model calls, so CI needs no secret."],
+    ["tests/", "258 offline tests", "Tools, retrieval, graph routing with fake roles, the 05 agent's guardrails with fake models, tracing, eval scoring. No model calls, so CI needs no secret."],
     ["docs/*.md", "11 policy docs", "Refunds, shipping, warranty, pricing and more for Acme, a sample store. The only source the bot may cite."],
     ["chat.db", "Conversation memory", "SQLite checkpoints, one thread per customer. 06 threads are stored as <code>06:&lt;name&gt;</code>. Not in git."],
     ["pyproject.toml", "Project config", "Dependencies, the <code>acme_support</code> package build, and pytest and ruff settings. Tests import scripts and evals through <code>pythonpath = [\"scripts\", \"evals\"]</code>."],
