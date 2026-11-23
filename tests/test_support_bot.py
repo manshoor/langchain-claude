@@ -421,6 +421,96 @@ def test_plain_yes_after_a_ticket_offer(tickets) -> None:
     assert tickets == ["Store pickup"]
 
 
+@pytest.mark.parametrize(
+    "before",
+    [
+        "Done: ticket TCK-0001 is open.",
+        "Your ticket TCK-0001 is open, anything else?",
+        "Do you already have a ticket number?",
+        "Shall I open a ticket? Or call a human first?",
+    ],
+)
+def test_yes_needs_the_exact_offer(tickets, before: str) -> None:
+    # Security review: any mention of a ticket made the next yes word consent.
+    rig = _rig([AIMessage(before), _ticket("Again"), AIMessage("Okay.")])
+    rig.say("What about my ticket?")
+
+    rig.say("Ok, thanks")
+
+    assert tickets == []
+
+
+def test_blocked_ticket_adds_the_offer(tickets) -> None:
+    # However the model words its reply, the next plain yes has a clear question.
+    rig = _rig(
+        [_ticket("Pickup"), AIMessage("Not covered."), _ticket("Pickup"), AIMessage("Done.")]
+    )
+
+    asked = rig.say("Can I pick it up in Abu Dhabi?")["messages"][-1].text
+    done = rig.say("Yes, go ahead and open it")["messages"][-1].text
+
+    assert asked == f"Not covered. {bot.TICKET_OFFER}"
+    assert tickets == ["Pickup"]
+    assert done == "Done."
+
+
+def test_offer_is_not_added_twice() -> None:
+    rig = _rig([_ticket("Pickup"), AIMessage(f"Not covered. {bot.TICKET_OFFER}")])
+
+    reply = rig.say("Can I pick it up?")["messages"][-1].text
+
+    assert reply.count(bot.TICKET_OFFER) == 1
+
+
+def test_no_offer_after_a_no(tickets) -> None:
+    rig = _rig([_ticket("Pickup"), AIMessage("Okay.")])
+
+    assert rig.say("I don't want a ticket.")["messages"][-1].text == "Okay."
+    assert tickets == []
+
+
+def test_no_offer_after_an_opened_ticket(tickets) -> None:
+    rig = _rig([_ticket("First", "Second"), AIMessage("Done.")])
+
+    assert rig.say("Open a ticket, please.")["messages"][-1].text == "Done."
+    assert tickets == ["First"]
+
+
+def test_complaint_gets_the_offer() -> None:
+    # Review: "hasn't" read as a no, so the customer never saw the question.
+    rig = _rig([_ticket("Late parcel"), AIMessage("Sorry about that.")])
+
+    reply = rig.say("My parcel hasn't arrived. I need a human.")["messages"][-1].text
+
+    assert reply.endswith(bot.TICKET_OFFER)
+
+
+def test_repeated_offer_asks_for_yes_or_no() -> None:
+    rig = _rig([AIMessage(bot.TICKET_OFFER), _ticket("Late parcel"), AIMessage("Noted.")])
+    rig.say("My parcel is late.")
+
+    reply = rig.say("Yes, it's urgent")["messages"][-1].text
+
+    assert reply == f"Noted. {bot.YES_OR_NO} {bot.TICKET_OFFER}"
+
+
+def test_offer_ignores_a_refusal_in_a_summary() -> None:
+    blocked = ToolMessage(
+        bot.TICKET_NEEDS_CONSENT, tool_call_id="c", name="create_ticket", status="error"
+    )
+    messages = [HumanMessage("No thanks", id="summary"), blocked, AIMessage("Noted.", id="r")]
+
+    updates = bot._add_offer({"messages": messages, "customer_message_id": "gone"}, 1)
+
+    assert updates[0].text.endswith(bot.TICKET_OFFER)
+
+
+def test_no_offer_on_an_unsafe_reply() -> None:
+    rig = _rig([_ticket("Pickup"), AIMessage("A poem")], guard=_Checker(UNSAFE))
+
+    assert rig.say("Can I pick it up?")["messages"][-1].text == guardrails.DECLINE_TEXT
+
+
 def test_retry_after_a_rejected_ticket_call(tickets) -> None:
     # Review: a call with bad arguments used up the turn's only ticket call.
     bad = _calls("create_ticket", {"summary": "Store pickup", "priority": "high"})

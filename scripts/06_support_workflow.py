@@ -21,7 +21,7 @@
        ▼
     reply → END
 
-    handoff ────────────── interrupt "Open a ticket?" → yes → create_ticket → END
+    handoff ────────────── interrupt "Open a ticket?" (unclear: ask once more) → yes → create_ticket → END
 
     memory:  SqliteSaver → chat.db, one thread per customer
 
@@ -87,11 +87,13 @@ from acme_support.guardrails import (
     DECLINED_PLACEHOLDER,
     MAX_MESSAGE_CHARS,
     TOO_LONG_TEXT,
+    Answer,
     Check,
     Safety,
     guard_input,
     is_yes,
     tagged,
+    ticket_answer,
 )
 from acme_support.paths import DB_PATH
 from acme_support.retrieval import load_chunks, vector_store
@@ -202,6 +204,7 @@ HANDOFF_QUESTION = "Shall I open a ticket so a human can help?"
 NOT_COVERED_QUESTION = "Our policies don't cover that. " + HANDOFF_QUESTION
 UNCONFIRMED_QUESTION = "I couldn't confirm a full answer from our policies. " + HANDOFF_QUESTION
 TICKET_TEXT = "I've passed this to a human. {ticket}"
+YES_OR_NO_QUESTION = "Please answer yes or no: " + HANDOFF_QUESTION
 NO_TICKET_TEXT = "Okay, no ticket. Is there anything else I can help with?"
 LIMIT_NOTES = "Research stopped at its call limit before writing notes. Raw passages:\n\n"
 RETRY_INPUT = "(retry of the previous turn)"
@@ -516,8 +519,13 @@ def _reply(state: TurnState) -> dict:
 
 def _handoff(state: TurnState) -> dict:
     """Ask the customer before opening a ticket. The graph pauses here."""
-    answer = interrupt(_consent_question(state))
-    if not is_yes(answer):
+    answer = ticket_answer(interrupt(_consent_question(state)))
+
+    # Unclear: ask once more. A second unclear answer opens nothing.
+    if answer is Answer.UNCLEAR:
+        answer = ticket_answer(interrupt(YES_OR_NO_QUESTION))
+
+    if answer is not Answer.YES:
         return {"messages": [AIMessage(NO_TICKET_TEXT)]}
 
     ticket = create_ticket.invoke(

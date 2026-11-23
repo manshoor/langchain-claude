@@ -231,6 +231,24 @@ def test_handoff_no_skips_ticket(config) -> None:
     assert "no ticket" in graph.get_state(config).values["messages"][-1].content.lower()
 
 
+@pytest.mark.parametrize(
+    ("second", "opened"), [("Yes, do it", True), ("no", False), ("You can go now, thanks", False)]
+)
+def test_unclear_answer_asks_once_more(config, second: str, opened: bool) -> None:
+    graph = _graph(_team([_triage("handoff")]))
+
+    _say(graph, config, "I want a human.")
+    graph.invoke(Command(resume="please explain first"), config)
+
+    assert graph.get_state(config).interrupts[0].value == wf.YES_OR_NO_QUESTION
+    assert support_tools._tickets == []
+
+    graph.invoke(Command(resume=second), config)
+
+    assert not graph.get_state(config).interrupts
+    assert bool(support_tools._tickets) is opened
+
+
 def test_second_turn_starts_clean(config) -> None:
     triages = [_triage("answer", ["refund?"]), _triage("chat")]
     graph = _graph(_team(triages, [_review("pass")]))
